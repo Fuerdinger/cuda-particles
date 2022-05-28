@@ -1,10 +1,14 @@
 # C++ OpenGL Game Framework (COGF)
 
+![alt text](logo.png)
+
 This is a starter project for creating a window, getting user input from it, rendering content to its screen, and playing audio.
 
 This starter kit is designed to make it as easy as possible to create any type of graphics project (video game, simulation, etc), build an executable from it, and share the executable with others.
 
 The project has only been tested on Windows, but it should theoretically work on Linux and Mac with minimal tweaking. 
+
+Switch to the `example` branch using `git checkout example` to see a simple demo!
 
 ## Features
 
@@ -178,7 +182,7 @@ int main()
 
 	std::vector<std::string> sfx = { "Jump", "Blip", "Shoot" };
 	std::vector<std::string> music = { "Background", "Level", "Credits" };
-    SoundManager::setPath("sounds\\");
+	SoundManager::setPath("sounds\\");
 	manager.createSounds(new SoundManager(sfx, music));
 
 	manager.build();
@@ -263,3 +267,7 @@ Notice that the `data/` and `untracked_data/` directories themselves were not co
 ## Using CRTDBG
 
 If you use CRTDBG to check for memory leaks, you may notice two memory leaks which occur if you load a sound effect or music file. This is not a true memory leak and instead seems to be a bug with the OpenAL32.dll file which CMake creates and puts into the executable directory of debug builds. You can be assured that all memory created by this project in the various manager classes (`SceneManager`, `ImageManager`, `SoundManager`, etc) is cleaned up properly by the time the program exits.
+
+## Give the demo a try
+
+Switch to the `example` branch using `git checkout example` to see a simple demo! The example creates a `Scene` in `main.cpp` which displays the project's logo and plays audio in the background.
