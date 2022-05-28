@@ -1,0 +1,11 @@
+{
+	"name": "my-project",
+	"version": "1.0.0",
+	"dependencies": [
+		"glfw3",
+		"glm",
+		"sfml",
+		"stb",
+		"glad"
+	]
+}
