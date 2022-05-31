@@ -39,10 +39,6 @@ THE SOFTWARE.
 //audio system
 #include <SFML/Audio.hpp>
 
-//font rendering
-#include <ft2build.h>
-#include FT_FREETYPE_H
-
 //GLFW window system, and GLAD for loading OpenGL
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
