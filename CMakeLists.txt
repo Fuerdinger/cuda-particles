@@ -48,7 +48,10 @@ project("cpp-opengl-game-framework"
 	VERSION 1.0.0
 	DESCRIPTION "A starter project for making OpenGL games or simulations with C++"
 	HOMEPAGE_URL "https://github.com/Fuerdinger/cpp-opengl-game-framework"
-	LANGUAGES CXX)
+	LANGUAGES CXX
+)
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${PROJECT_NAME}")
 
 # The project currently doesn't use C++17 features but it may in the future
 set(CMAKE_CXX_STANDARD 17)
@@ -108,21 +111,29 @@ endif()
 # Copy asset data to the executable directory
 # Deleting a file in root/data/ and then building again will NOT delete it from build/data/
 if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/data/")
-	install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/data/" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
+	add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD COMMAND
+		"${CMAKE_COMMAND}" -E copy_directory
+		"${CMAKE_CURRENT_LIST_DIR}/data/"
+		"${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+	)
 endif()
 if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/untracked_data/")
-	install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/untracked_data/" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
+	add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD COMMAND
+		"${CMAKE_COMMAND}" -E copy_directory
+		"${CMAKE_CURRENT_LIST_DIR}/untracked_data/"
+		"${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+	)
 endif()
 
 # Copy runtimes from System32 folder for Release builds
 if(${CMAKE_BUILD_TYPE} MATCHES "Rel")
 	if(DEFINED ENV{WINDIR})
-		file(COPY
+		add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD COMMAND
+			"${CMAKE_COMMAND}" -E copy_if_different
 			"$ENV{WINDIR}/System32/VCRUNTIME140.dll"
 			"$ENV{WINDIR}/System32/VCRUNTIME140_1.dll"
 			"$ENV{WINDIR}/System32/MSVCP140.dll"
-			DESTINATION
-			"${CMAKE_CURRENT_BINARY_DIR}"
-			)
+			"${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+		)
 	endif()
 endif()
