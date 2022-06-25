@@ -1,12 +1,12 @@
-# C++ OpenGL Game Framework (COGF)
+# C++ OpenGL Game Framework
 
 ![alt text](logo.png)
 
 This is a starter project for creating a window, getting user input from it, rendering content to its screen, and playing audio.
 
-This starter kit is designed to make it as easy as possible to create any type of graphics project (video game, simulation, etc), build an executable from it, and share the executable with others.
+This starter kit is designed to make it as easy as possible to create any type of graphics project (video game, simulation, etc), build an executable from it, and share the software with others.
 
-The project has only been tested on Windows, but it should theoretically work on Linux and Mac with minimal tweaking. 
+The project has only been tested on Windows, but it should theoretically work on Linux with minimal tweaking. 
 
 Switch to the `example` branch using `git checkout example` to see a simple demo!
 
@@ -28,21 +28,29 @@ Switch to the `example` branch using `git checkout example` to see a simple demo
 * stb, for reading and writing PNG images
 * in the future, FreeType will be added for text rendering
 
-# License
+## License
 
 This project is licensed under the **MIT License** (see `LICENSE.txt`) and created by **Daniel Fuerlinger**. If you fork this project or do anything else with it, you may not remove my copyright notices. But of course, you may specify licensing and copyrights for your own additions to the codebase.
 
-Note that the libraries used by the project each have their own licenses you must abide by. The most restrictive of these is openal-soft's LGPL license.
+The `data/LICENSE.txt` file will be copied into the executable's directory when built. As long as you redistribute your executable with this license included, your software *should* satisfy the licensing requirements of all the third party libraries and enable you to sell your software commercially. I am not a legal expert though, so this is may not be the case.
+
+**Make sure to update the `data/LICENSE.txt` file** to have your name and the name of your software at the very top, instead of my name and cpp-opengl-game-framework. Additionally, **you are responsible for updating this file** to include any licensing and copyright information which goes beyond this simple project. This would include if you added a library to the project or used copyrighted game assets, among other things.
 
 # Building
 
-This project uses **CMake** with a single `CMakeLists.txt` file to build an executable.
+This project uses **CMake** with a single `CMakeLists.txt` file to build an executable. A `CMakeSettings.json` file is provided for Visual Studio users. After cloning the project you can open `CMakeLists.txt` using Visual Studio with `File > Open > CMake`, or use the command line like so:
+
+```
+git clone https://github.com/Fuerdinger/cpp-opengl-game-framework.git
+cd cpp-opengl-game-framework
+mkdir bin
+cd bin
+cmake ..
+```
 
 The **vcpkg** package manager is required to build the project on Windows. Make sure that the environment variable `%VCPKG_ROOT%` is specified and that it points to the root directory of your installation of vcpkg. For example, `C:\src\vcpkg`
 
 Instructions for downloading vcpkg: https://vcpkg.io/en/getting-started.html
-
-Currently, the only configurations for the project are for Windows, so Linux and Mac users will have to specify their own in the `CMakeSettings.json` file.
 
 It is recommended to use a vcpkg triplet which requires SFML and its dependencies to be dynamically linked against the executable. This is because one of SFML's dependencies is openal-soft, which is licensed under LGPL. If you don't dynamically link an LGPL library, then your project becomes infected by the LGPL license, which prevents you from using it for commercial purposes. Here is a vcpkg triplet you may use that makes all libraries statically linked, except for SFML and openal-soft.
 
@@ -208,7 +216,7 @@ You may have noticed in the above example that we specified some paths to where 
 
 But, how do these files become relative to the executable? This is done via CMake.
 
-As part of the CMake build process, any files in directories named `data/` or `untracked_data/` will be copied into the executable's directory. The only difference between these two directories is that `untracked_data/` is ignored in the `.gitignore` file. These directories are not part of the git repo, so you are responsible for creating them yourself.
+As part of the CMake build process, any files in directories named `data/` or `untracked_data/` will be copied into the executable's directory. The only difference between these two directories is that `untracked_data/` is ignored in the `.gitignore` file; as such, it is not part of the repository, so you will need to create it yourself if you want it.
 
 Here is an example of how you could separate your assets. Shaders could go in `data/` so they are tracked by git, but the OGG and PNG files could go in `untracked_data/` so they are not tracked by git.
 
@@ -216,6 +224,7 @@ Here is an example of how you could separate your assets. Shaders could go in `d
 |-> MyProject
 
     |-> data/
+        |-> LICENSE.txt
         |-> shaders/
             |-> Vert.shader
             |-> Frag.shader
@@ -239,9 +248,11 @@ Here is an example of how you could separate your assets. Shaders could go in `d
 After building with CMake, the executable's directory will look like:
 
 ```
-|-> x64-Debug / x64-Release
+|-> x64-Debug / MyProject
 
     |-> MyProject.exe
+
+    |-> LICENSE.txt
 
     |-> SillyFooFile.txt
 
