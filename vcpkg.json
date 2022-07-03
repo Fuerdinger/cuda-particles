@@ -1,5 +1,5 @@
 {
-	"name": "cpp-opengl-game-framework",
+	"name": "cuda-particles",
 	"version": "1.0.0",
 	"dependencies": [
 		"glfw3",

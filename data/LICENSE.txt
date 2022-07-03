@@ -1,4 +1,4 @@
-"cpp-opengl-game-framework"
+"cuda-particles"
 Copyright (c) 2022 Daniel Fuerlinger
 
 This copyright applies to the executable file's code and all file assets used by the software,

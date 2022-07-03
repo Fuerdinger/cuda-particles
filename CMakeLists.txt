@@ -44,11 +44,11 @@ endif()
 # We want to export an executable that is dynamically linked against the CRT
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL" CACHE STRING "msvc runtime")
 
-project("cpp-opengl-game-framework"
+project("cuda-particles"
 	VERSION 1.0.0
-	DESCRIPTION "A starter project for making OpenGL games or simulations with C++"
+	DESCRIPTION "fork of cpp-opengl-game-framework for doing particle simulations"
 	HOMEPAGE_URL "https://github.com/Fuerdinger/cpp-opengl-game-framework"
-	LANGUAGES CXX
+	LANGUAGES CXX CUDA
 )
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${PROJECT_NAME}")
