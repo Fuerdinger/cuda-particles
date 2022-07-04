@@ -101,6 +101,11 @@ void APIENTRY glErrorCallback(GLenum source,
 	const char* message,
 	const void* userParam)
 {
+	if (id == 131169 || id == 131185 || id == 131218 || id == 131204)
+	{
+		return;
+	}
+
 	std::string mySource = "";
 	std::string myType = "";
 	std::string mySeverity = "";
@@ -185,7 +190,7 @@ void APIENTRY glErrorCallback(GLenum source,
 
 	fprintf(stderr, "OpenGL (%d): %s\nSource: %s\nType: %s\nSeverity: %s\n\n", id, message, mySource.c_str(), myType.c_str(), mySeverity.c_str());
 
-	if (!(id == 131169 || id == 131185 || id == 131218 || id == 131204))
+	if (severity != GL_DEBUG_SEVERITY_NOTIFICATION)
 	{
 		abort();
 	}
