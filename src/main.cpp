@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 *****************************************************************************/
 
-#include "Scene.h"
+#include "SimulationScene.h"
 
 #if defined(_WIN32) && !defined(_DEBUG)
 int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nCmdShow)
@@ -36,5 +36,5 @@ int main()
 
 	SceneManager manager;
 	manager.build();
-	manager.run({ new Scene("Scene")});
+	manager.run({ new SimulationScene() });
 }

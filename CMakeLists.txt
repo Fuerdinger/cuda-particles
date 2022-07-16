@@ -72,6 +72,7 @@ set(SRC_FILES
 	"src/Image.cpp"
 	"src/main.cpp"
 	"src/Scene.cpp"
+	"src/SimulationScene.cu"
 	"src/Sound.cpp"
 	"src/Util.cpp"
 	"src/Window.cpp"
@@ -80,7 +81,7 @@ set(INCLUDE_DIRS
 	"include"
 )
 add_executable(${PROJECT_NAME} ${SRC_FILES})
-target_include_directories(${PROJECT_NAME} PRIVATE ${INCLUDE_DIRS})
+target_include_directories(${PROJECT_NAME} PRIVATE ${INCLUDE_DIRS} ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 target_precompile_headers(${PROJECT_NAME} PRIVATE "include/pch.h")
 
 # Windows release builds should not be console apps

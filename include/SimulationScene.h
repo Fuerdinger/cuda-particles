@@ -23,59 +23,51 @@ THE SOFTWARE.
 *****************************************************************************/
 
 #pragma once
+#include "Scene.h"
 
-//reduce warning level for 3rd party libraries
-#pragma warning (push, 0)
+class SimulationScene : public Scene
+{
+public:
+	//number of dimensions of the particles in the sim
+	typedef glm::vec2 pVec;
 
-//include windows debugging tools
-#ifdef _WIN32
-#include <Windows.h>
-	#ifdef _DEBUG
-#include <crtdbg.h>
-#define _CRTDBG_MAP_ALLOC
-	#endif
-#endif
+	//data for each particle in the sim
+	struct Particle
+	{
+		pVec position;
+		pVec velocity;
+	};
 
-//audio system
-#include <SFML/Audio.hpp>
+	void swapDeviceParticles();
+private:
+	//see the src file for what these values do
+	static const unsigned int numParticles;
+	static const float displayParticleHalfWidth;
+	static const float particleRadius;
+	static const pVec velocityDullingFactor;
+	static const float velocityDullingFactorRate;
+	static const pVec gravity;
+	static const pVec boundMin;
+	static const pVec boundMax;
+	static const float maxExplodeRange;
+	static const float maxExplodeForce;
+	static const float maxSuctionRange;
+	static const float maxSuctionForce;
 
-//GLFW window system, and GLAD for loading OpenGL
-#define GLFW_INCLUDE_NONE
-#include <GLFW/glfw3.h>
-#include <glad/glad.h>
+	//ptrs to device memory for particles
+	Particle* m_deviceParticlesIn;
+	Particle* m_deviceParticlesOut;
 
-//stb_image for reading/writing PNG images
-#include <stb_image.h>
-#include <stb_image_write.h>
+	//graphics resources
+	GLuint m_vao;
+	GLuint m_vbo;
+	cudaGraphicsResource_t m_vboResource;
+	GLuint m_program;
+public:
+	SimulationScene();
+	~SimulationScene();
 
-//CUDA
-#include <cuda.h>
-#include <cuda_runtime.h>
-#include <cuda_runtime_api.h>
-#include <cuda_gl_interop.h>
-#include <device_launch_parameters.h>
-
-//GLM math library
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_CUDA
-#include <glm/glm.hpp>
-#include <glm/vec2.hpp>
-#include <glm/vec3.hpp>
-#include <glm/vec4.hpp>
-#include <glm/mat4x2.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtx/matrix_decompose.hpp>
-#include <glm/gtx/quaternion.hpp>
-
-//C runtime and STL
-#include <cstring>
-#include <string>
-#include <vector>
-#include <map>
-#include <unordered_map>
-#include <chrono>
-#include <random>
-#include <fstream>
-
-//set warning level back to normal
-#pragma warning (pop)
+	void update(float deltaTime);
+	void render();
+	void switchFrom(const std::string& previousScene, void* data = nullptr);
+};
