@@ -43,6 +43,9 @@ private:
 	//see the src file for what these values do
 	static const unsigned int numParticles;
 	static const float displayParticleHalfWidth;
+	static const glm::vec2 particleRedRange;
+	static const glm::vec2 particleGreenRange;
+	static const glm::vec2 particleBlueRange;
 	static const float particleRadius;
 	static const pVec velocityDullingFactor;
 	static const float velocityDullingFactorRate;
@@ -54,13 +57,17 @@ private:
 	static const float maxSuctionRange;
 	static const float maxSuctionForce;
 
+	//number of blocks & threads we can have, at most
+	unsigned int m_maxNumBlocks;
+	unsigned int m_maxNumThreads;
+
 	//ptrs to device memory for particles
 	Particle* m_deviceParticlesIn;
 	Particle* m_deviceParticlesOut;
 
 	//graphics resources
 	GLuint m_vao;
-	GLuint m_vbo;
+	GLuint m_vbo[2];
 	cudaGraphicsResource_t m_vboResource;
 	GLuint m_program;
 public:

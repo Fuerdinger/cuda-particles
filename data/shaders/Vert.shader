@@ -25,10 +25,14 @@ THE SOFTWARE.
 #version 430 core
 
 layout(location = 0) in vec2 inPosition;
+layout(location = 1) in vec4 inColor;
 
 layout(location = 0) uniform mat4 view_proj;
+
+out vec4 col;
 
 void main()
 {
 	gl_Position = view_proj * vec4(inPosition.x, inPosition.y, 0.0f, 1.0f);
+	col = inColor;
 }

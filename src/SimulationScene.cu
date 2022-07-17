@@ -26,11 +26,16 @@ THE SOFTWARE.
 
 #define PVEC_DIM (sizeof(SimulationScene::pVec) / sizeof(float))
 
-//number of particles in the simulation (currently must be <= 1024)
-const unsigned int SimulationScene::numParticles = 1024;
+//number of particles in the simulation
+const unsigned int SimulationScene::numParticles = 5120;
 
 //radius of the particle to render
 const float SimulationScene::displayParticleHalfWidth = 5.0f;
+
+//color value ranges for the particles
+const glm::vec2 SimulationScene::particleRedRange = glm::vec2(0.0f, 0.05f);
+const glm::vec2 SimulationScene::particleGreenRange = glm::vec2(0.0f, 0.1f);
+const glm::vec2 SimulationScene::particleBlueRange = glm::vec2(0.65f, 1.0f);
 
 //radius of the particle in the simulation
 const float SimulationScene::particleRadius = 5.0f;
@@ -107,29 +112,43 @@ __device__ SimulationScene::pVec cudaPow(const SimulationScene::pVec& base, cons
 	return ret;
 }
 
+__device__ float cudaCeil(const float val)
+{
+	return (float)((unsigned int)(val + 1));
+}
+
+__device__ unsigned int cudaMin(const unsigned int val1, const unsigned int val2)
+{
+	return val1 < val2 ? val1 : val2;
+}
+
 __global__ void cudaRun(
 	const SimulationScene::Particle* const particlesIn,
 	SimulationScene::Particle* const particlesOut,
 	const unsigned int numParticles,
 	const float deltaTime)
 {
-	const unsigned int index = blockIdx.x;
-	const unsigned int otherIndex = threadIdx.x;
+	if (threadIdx.x == 0) d_positionDelta = SimulationScene::pVec(0.0f);
+	__syncthreads();
 
+	const unsigned int index = blockIdx.x;
 	const SimulationScene::Particle in = particlesIn[index];
 	SimulationScene::Particle* const out = particlesOut + index;
-
-	const SimulationScene::Particle other = particlesIn[otherIndex];
 
 	SimulationScene::pVec position = in.position;
 	SimulationScene::pVec velocity = in.velocity;
 	position += velocity * deltaTime;
 
-	d_positionDelta = SimulationScene::pVec(0.0f);
+	const unsigned int numOtherParticles = cudaCeil((float)numParticles / (float)blockDim.x);
+	const unsigned int firstOtherParticle = threadIdx.x * numOtherParticles;
+	const unsigned int lastOtherParticle = cudaMin(firstOtherParticle + numOtherParticles, numParticles);
 
-	__syncthreads();
-	if (index != otherIndex)
+	SimulationScene::pVec positionDelta = SimulationScene::pVec(0.0f);
+	for (unsigned int i = firstOtherParticle; i < lastOtherParticle; i++)
 	{
+		if (i == index) continue;
+		const SimulationScene::Particle other = particlesIn[i];
+
 		//if the distance between the two circle centerpoints is less than the sum
 		//of the radii, then they must be overlapping.
 		const SimulationScene::pVec otherPos = other.position + other.velocity * deltaTime;
@@ -146,18 +165,18 @@ __global__ void cudaRun(
 			const float overlappingDistance = radiusSum - distance;
 			const SimulationScene::pVec overlappingDelta = (delta / distance) * overlappingDistance;
 			const SimulationScene::pVec dis = overlappingDelta * 0.5f;
-
-			#pragma unroll
-			for (char i = 0; i < PVEC_DIM; i++)
-			{
-				atomicAdd(&d_positionDelta[i], dis[i]);
-			}
+			positionDelta += dis;
 		}
+	}
+	#pragma unroll
+	for (char i = 0; i < PVEC_DIM; i++)
+	{
+		atomicAdd(&d_positionDelta[i], positionDelta[i]);
 	}
 	__syncthreads();
 
 	//only 1 thread should do this part
-	if (index == otherIndex)
+	if (threadIdx.x == 0)
 	{
 		//collision update
 		position += d_positionDelta;
@@ -189,7 +208,8 @@ __global__ void cudaUpdateInfo(
 	const unsigned int numParticles,
 	const float deltaTime)
 {
-	const unsigned int index = blockIdx.x;
+	const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+	if (index >= numParticles) return;
 	const SimulationScene::Particle* const out = outParticles + index;
 	SimulationScene::pVec* const vertex = vertices + index;
 	*vertex = out->position;
@@ -207,9 +227,10 @@ __global__ void cudaExplode(
 	SimulationScene::Particle* const inParticles,
 	const unsigned int numParticles,
 	const float deltaTime,
-	const glm::vec2 pos)
+	const SimulationScene::pVec pos)
 {
-	const unsigned int index = blockIdx.x;
+	const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+	if (index >= numParticles) return;
 	SimulationScene::Particle* const in = inParticles + index;
 
 	//apply a velocity based on the vector from the explosion to particle
@@ -230,9 +251,10 @@ __global__ void cudaSuction(
 	SimulationScene::Particle* const inParticles,
 	const unsigned int numParticles,
 	const float deltaTime,
-	const glm::vec2 pos)
+	const SimulationScene::pVec pos)
 {
-	const unsigned int index = blockIdx.x;
+	const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+	if (index >= numParticles) return;
 	SimulationScene::Particle* const in = inParticles + index;
 
 	//apply a velocity based on the vector from the suction to particle
@@ -256,19 +278,23 @@ void SimulationScene::swapDeviceParticles()
 SimulationScene::SimulationScene()
 	: Scene("Simulation")
 {
-	//generate distributions based on size of simulation bounding box
+	//generate distributions based on size of simulation bounding box, expected color values
 	std::mt19937_64 rng;
 	std::uniform_real_distribution<float> dis[PVEC_DIM];
 	for (char i = 0; i < PVEC_DIM; i++)
 	{
 		dis[i] = std::uniform_real_distribution<float>(boundMin[i], boundMax[i]);
 	}
+	std::uniform_real_distribution<float> redDis = std::uniform_real_distribution<float>(particleRedRange.x, particleRedRange.y);
+	std::uniform_real_distribution<float> greenDis = std::uniform_real_distribution<float>(particleGreenRange.x, particleGreenRange.y);
+	std::uniform_real_distribution<float> blueDis = std::uniform_real_distribution<float>(particleBlueRange.x, particleBlueRange.y);
 
 	//separate memory for rendering particles and for cuda compute particles
 	pVec* particleVertices = (pVec*)malloc(numParticles * sizeof(pVec));
+	glm::vec4* particleColors = (glm::vec4*)malloc(numParticles * sizeof(glm::vec4));
 	Particle* particles = (Particle*)malloc(numParticles * sizeof(Particle));
 
-	//initialize random positions
+	//initialize random positions and colors
 	for (int i = 0; i < numParticles; i++)
 	{ 
 		for (char j = 0; j < PVEC_DIM; j++)
@@ -277,22 +303,29 @@ SimulationScene::SimulationScene()
 		}
 		particles[i].velocity = pVec(0.0f);
 		particles[i].position = particleVertices[i];
+		particleColors[i] = glm::vec4(redDis(rng), greenDis(rng), blueDis(rng), 1.0f);
 	};
 
-	//VAO with 1 VBO for particle positions
+	//VAO with 2 VBOs, one for particle positions, one for colors
 	glGenVertexArrays(1, &m_vao);
 	glBindVertexArray(m_vao);
-	glGenBuffers(1, &m_vbo);
-	glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
+	glGenBuffers(2, m_vbo);
+
+	glBindBuffer(GL_ARRAY_BUFFER, m_vbo[0]);
 	glBufferData(GL_ARRAY_BUFFER, numParticles * sizeof(pVec), particleVertices, GL_DYNAMIC_DRAW);
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, PVEC_DIM, GL_FLOAT, GL_FALSE, 0, NULL);
+
+	glBindBuffer(GL_ARRAY_BUFFER, m_vbo[1]);
+	glBufferData(GL_ARRAY_BUFFER, numParticles * sizeof(glm::vec4), particleColors, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, NULL);
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
 
 	//cuda can write to the particle vertices via m_vboResource
-	cuCheck(cudaGraphicsGLRegisterBuffer(&m_vboResource, m_vbo, cudaGraphicsRegisterFlagsWriteDiscard));
+	cuCheck(cudaGraphicsGLRegisterBuffer(&m_vboResource, m_vbo[0], cudaGraphicsRegisterFlagsWriteDiscard));
 
 	//allocate memory for cuda particles, copy data into the first one
 	cuCheck(cudaMalloc((void**)&m_deviceParticlesIn, numParticles * sizeof(Particle)));
@@ -300,6 +333,7 @@ SimulationScene::SimulationScene()
 	cuCheck(cudaMemcpy(m_deviceParticlesIn, particles, numParticles * sizeof(Particle), cudaMemcpyHostToDevice));
 
 	free(particleVertices);
+	free(particleColors);
 	free(particles);
 
 	//copy simulation constants into constant cuda memory
@@ -314,6 +348,17 @@ SimulationScene::SimulationScene()
 	cuCheck(cudaMemcpyToSymbol(d_maxSuctionRange, &maxSuctionRange, sizeof(float), 0, cudaMemcpyHostToDevice));
 	cuCheck(cudaMemcpyToSymbol(d_maxSuctionForce, &maxSuctionForce, sizeof(float), 0, cudaMemcpyHostToDevice));
 
+	//get properties from user's GPU to ensure maximum performance of simulation
+	cudaDeviceProp properties;
+	cuCheck(cudaGetDeviceProperties(&properties, 0));
+	m_maxNumBlocks = properties.maxGridSize[0];
+	m_maxNumThreads = properties.maxThreadsDim[0];
+	if (m_maxNumBlocks < numParticles)
+	{
+		fprintf(stderr, "Error: gpu's max grid size is %d, which is too low for %d particles", m_maxNumBlocks, numParticles);
+		abort();
+	}
+
 	//create rendering program from shaders
 	m_program = _util->createProgramFromDisk("shaders\\Vert.shader", "shaders\\Frag.shader");
 }
@@ -321,7 +366,7 @@ SimulationScene::SimulationScene()
 SimulationScene::~SimulationScene()
 {
 	glDeleteProgram(m_program);
-	glDeleteBuffers(1, &m_vbo);
+	glDeleteBuffers(2, m_vbo);
 	glDeleteVertexArrays(1, &m_vao);
 
 	cuCheck(cudaFree(m_deviceParticlesIn));
@@ -330,37 +375,41 @@ SimulationScene::~SimulationScene()
 
 void SimulationScene::update(float deltaTime)
 {
-	dim3 block(numParticles);
-	dim3 thread(numParticles);
+	dim3 block1D(ceil((float)numParticles / (float)m_maxNumThreads));
+	dim3 thread1D(std::min(numParticles, m_maxNumThreads));
+
+	dim3 block2D(numParticles);
+	dim3 thread2D(std::min(numParticles, m_maxNumThreads));
+
+	cudaStream_t stream;
+	cuCheck(cudaStreamCreate(&stream));
 	
 	//apply explode or suction based on user input
 	bool explode = _window->mousePressed(GLFW_MOUSE_BUTTON_1);
 	bool suction = _window->mousePressed(GLFW_MOUSE_BUTTON_2);
 	if (explode || suction)
 	{
-		glm::vec2 pos = _window->getCursorPos();
-		pos.x -= _window->getFramebufferSize().x * 0.5f;
-		pos.y -= _window->getFramebufferSize().y * 0.5f;
-		pos.y *= -1.0f;
+		glm::vec2 cursorPos = _window->getCursorPos();
+		cursorPos.x -= _window->getFramebufferSize().x * 0.5f;
+		cursorPos.y -= _window->getFramebufferSize().y * 0.5f;
+		cursorPos.y *= -1.0f;
+		pVec pos = cursorPos;
 
 		//reads from particlesIn, stores results in particlesIn
-		if (explode) cudaExplode<<<block,1>>>(m_deviceParticlesIn, numParticles, deltaTime, pos);
-		else if (suction) cudaSuction<<<block,1>>>(m_deviceParticlesIn, numParticles, deltaTime, pos);
-		cuAsyncCheck();
+		if (explode) cudaExplode<<<block1D,thread1D,0,stream>>>(m_deviceParticlesIn, numParticles, deltaTime, pos);
+		else if (suction) cudaSuction<<<block1D,thread1D,0,stream>>>(m_deviceParticlesIn, numParticles, deltaTime, pos);
 	}
 
 	//main physics computation; reads from particlesIn, stores results in particlesOut
-	cudaRun<<<block,thread>>>(m_deviceParticlesIn, m_deviceParticlesOut, numParticles, deltaTime);
-	cuAsyncCheck();
+	cudaRun<<<block2D,thread2D,0,stream>>>(m_deviceParticlesIn, m_deviceParticlesOut, numParticles, deltaTime);
 
 	//map opengl verts into memory; reads from particlesOut, stores results in the VBO
 	pVec* particleVertices;
 	size_t size;
-	cuCheck(cudaGraphicsMapResources(1, &m_vboResource));
+	cuCheck(cudaGraphicsMapResources(1, &m_vboResource, stream));
 	cuCheck(cudaGraphicsResourceGetMappedPointer((void**)&particleVertices, &size, m_vboResource));
-	cudaUpdateInfo<<<block,1>>>(m_deviceParticlesOut, particleVertices, numParticles, deltaTime);
-	cuAsyncCheck();
-	cuCheck(cudaGraphicsUnmapResources(1, &m_vboResource));
+	cudaUpdateInfo<<<block1D,thread1D,0,stream>>>(m_deviceParticlesOut, particleVertices, numParticles, deltaTime);
+	cuCheck(cudaGraphicsUnmapResources(1, &m_vboResource, stream));
 
 	//particlesOut will become particlesIn for the next iteration
 	swapDeviceParticles();
@@ -370,6 +419,9 @@ void SimulationScene::update(float deltaTime)
 	glm::ivec2 frameBufferSize = _window->getFramebufferSize();
 	glm::mat4 view_proj = glm::ortho((float)-frameBufferSize.x / 2, (float)frameBufferSize.x / 2, (float)-frameBufferSize.y / 2, (float)frameBufferSize.y / 2);
 	glUniformMatrix4fv(0, 1, false, (GLfloat*)&view_proj);
+
+	cuCheck(cudaStreamSynchronize(stream));
+	cuCheck(cudaStreamDestroy(stream));
 }
 
 void SimulationScene::render()
