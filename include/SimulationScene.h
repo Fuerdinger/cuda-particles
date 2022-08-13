@@ -38,10 +38,11 @@ public:
 		pVec velocity;
 	};
 
-	void swapDeviceParticles();
 private:
 	//see the src file for what these values do
-	static const unsigned int numParticles;
+	static const unsigned int maxNumParticles;
+	static const unsigned int numParticlesToSpawn;
+	static const unsigned int numParticlesAtStart;
 	static const float displayParticleHalfWidth;
 	static const glm::vec2 particleRedRange;
 	static const glm::vec2 particleGreenRange;
@@ -64,12 +65,18 @@ private:
 	//ptrs to device memory for particles
 	Particle* m_deviceParticlesIn;
 	Particle* m_deviceParticlesOut;
+	unsigned int m_numParticles;
 
 	//graphics resources
 	GLuint m_vao;
 	GLuint m_vbo[2];
 	cudaGraphicsResource_t m_vboResource;
 	GLuint m_program;
+
+	//helpers
+	void swapDeviceParticles();
+	pVec getCursorPos() const;
+
 public:
 	SimulationScene();
 	~SimulationScene();
