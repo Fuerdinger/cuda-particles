@@ -36,6 +36,7 @@ public:
 	{
 		pVec position;
 		pVec velocity;
+		glm::vec4 color;
 	};
 
 private:
@@ -43,7 +44,8 @@ private:
 	static const unsigned int maxNumParticles;
 	static const unsigned int numParticlesToSpawn;
 	static const unsigned int numParticlesAtStart;
-	static const float displayParticleHalfWidth;
+	static const float displayParticleRadius;
+	static const unsigned int displayParticleVertices;
 	static const glm::vec2 particleRedRange;
 	static const glm::vec2 particleGreenRange;
 	static const glm::vec2 particleBlueRange;
@@ -69,13 +71,15 @@ private:
 
 	//graphics resources
 	GLuint m_vao;
-	GLuint m_vbo[2];
-	cudaGraphicsResource_t m_vboResource;
+	GLuint m_vbo;
+	GLuint m_ubo;
+	cudaGraphicsResource_t m_uboResource;
 	GLuint m_program;
 
 	//helpers
 	void swapDeviceParticles();
 	pVec getCursorPos() const;
+	void spawnParticles(const pVec& pos, cudaStream_t stream);
 
 public:
 	SimulationScene();

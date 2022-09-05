@@ -27,7 +27,7 @@ THE SOFTWARE.
 #define PVEC_DIM (sizeof(SimulationScene::pVec) / sizeof(float))
 
 //number of particles in the simulation
-const unsigned int SimulationScene::maxNumParticles = 5120;
+const unsigned int SimulationScene::maxNumParticles = 2048;
 
 //number of particles to spawn when user clicks on screen
 const unsigned int SimulationScene::numParticlesToSpawn = 5;
@@ -36,7 +36,10 @@ const unsigned int SimulationScene::numParticlesToSpawn = 5;
 const unsigned int SimulationScene::numParticlesAtStart = 0;
 
 //radius of the particle to render
-const float SimulationScene::displayParticleHalfWidth = 5.0f;
+const float SimulationScene::displayParticleRadius = 5.0f;
+
+//number of vertices on the circumference of a particle's circle (-2 to include origin and first vertex twice)
+const unsigned int SimulationScene::displayParticleVertices = 12;
 
 //color value ranges for the particles
 const glm::vec2 SimulationScene::particleRedRange = glm::vec2(0.0f, 0.05f);
@@ -72,6 +75,8 @@ const float SimulationScene::maxSuctionRange = 100.0f;
 
 //the velocity of a particle right next to the suction (tapers off as it is farther away)
 const float SimulationScene::maxSuctionForce = 10.0f;
+
+std::mt19937_64 rng;
 
 void cudaErrorCheck(cudaError_t result, const char* func, int line, const char* file)
 {
@@ -205,20 +210,8 @@ __global__ void cudaRun(
 		//finally store results
 		out->position = position;
 		out->velocity = velocity;
+		out->color = in.color;
 	}
-}
-
-__global__ void cudaUpdateInfo(
-	const SimulationScene::Particle* const outParticles,
-	SimulationScene::pVec* vertices,
-	const unsigned int numParticles,
-	const float deltaTime)
-{
-	const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
-	if (index >= numParticles) return;
-	const SimulationScene::Particle* const out = outParticles + index;
-	SimulationScene::pVec* const vertex = vertices + index;
-	*vertex = out->position;
 }
 
 __device__ float cudaLerp(const float x0, const float x1, const float t)
@@ -295,7 +288,6 @@ SimulationScene::SimulationScene()
 	: Scene("Simulation")
 {
 	//generate distributions based on size of simulation bounding box, expected color values
-	std::mt19937_64 rng;
 	std::uniform_real_distribution<float> dis[PVEC_DIM];
 	for (char i = 0; i < PVEC_DIM; i++)
 	{
@@ -305,53 +297,56 @@ SimulationScene::SimulationScene()
 	std::uniform_real_distribution<float> greenDis = std::uniform_real_distribution<float>(particleGreenRange.x, particleGreenRange.y);
 	std::uniform_real_distribution<float> blueDis = std::uniform_real_distribution<float>(particleBlueRange.x, particleBlueRange.y);
 
-	//separate memory for rendering particles and for cuda compute particles
-	pVec* particleVertices = (pVec*)malloc(maxNumParticles * sizeof(pVec));
-	glm::vec4* particleColors = (glm::vec4*)malloc(maxNumParticles * sizeof(glm::vec4));
-	Particle* particles = (Particle*)malloc(maxNumParticles * sizeof(Particle));
-
 	m_numParticles = numParticlesAtStart;
 
+	Particle* particles = (Particle*)malloc(maxNumParticles * sizeof(Particle));
+
 	//initialize random positions and colors
-	for (unsigned int i = 0; i < maxNumParticles; i++)
+	for (unsigned int i = 0; i < m_numParticles; i++)
 	{ 
 		for (char j = 0; j < PVEC_DIM; j++)
 		{
-			particleVertices[i][j] = dis[j](rng);
+			particles[i].position[j] = dis[j](rng);
 		}
 		particles[i].velocity = pVec(0.0f);
-		particles[i].position = particleVertices[i];
-		particleColors[i] = glm::vec4(redDis(rng), greenDis(rng), blueDis(rng), 1.0f);
+		particles[i].color = glm::vec4(redDis(rng), greenDis(rng), blueDis(rng), 1.0f);
 	};
 
-	//VAO with 2 VBOs, one for particle positions, one for colors
+	//put the particle data into a UBO
+	glGenBuffers(1, &m_ubo);
+	glBindBuffer(GL_UNIFORM_BUFFER, m_ubo);
+	glBufferData(GL_UNIFORM_BUFFER, maxNumParticles * sizeof(Particle), particles, GL_DYNAMIC_COPY);
+	glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
+	//generate triangle fan of circle vertices
+	glm::vec2* circlePoints = (glm::vec2*)malloc(displayParticleVertices * sizeof(glm::vec2));
+	float angleInterval = 6.283185f / (displayParticleVertices - 2);
+	circlePoints[0] = glm::vec2(0.0f, 0.0f);
+	for (unsigned int i = 1; i < displayParticleVertices; i++)
+	{
+		const float angle = (i - 1) * angleInterval;
+		circlePoints[i] = glm::vec2(cos(angle) * displayParticleRadius, sin(angle) * displayParticleRadius);
+	}
+
+	//VAO with 1 VBOs for the circle
 	glGenVertexArrays(1, &m_vao);
 	glBindVertexArray(m_vao);
-	glGenBuffers(2, m_vbo);
-
-	glBindBuffer(GL_ARRAY_BUFFER, m_vbo[0]);
-	glBufferData(GL_ARRAY_BUFFER, maxNumParticles * sizeof(pVec), particleVertices, GL_DYNAMIC_DRAW);
+	glGenBuffers(1, &m_vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
+	glBufferData(GL_ARRAY_BUFFER, displayParticleVertices * sizeof(pVec), circlePoints, GL_STATIC_DRAW);
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, PVEC_DIM, GL_FLOAT, GL_FALSE, 0, NULL);
-
-	glBindBuffer(GL_ARRAY_BUFFER, m_vbo[1]);
-	glBufferData(GL_ARRAY_BUFFER, maxNumParticles * sizeof(glm::vec4), particleColors, GL_STATIC_DRAW);
-	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, NULL);
-
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
+	free(circlePoints);
 
-	//cuda can write to the particle vertices via m_vboResource
-	cuCheck(cudaGraphicsGLRegisterBuffer(&m_vboResource, m_vbo[0], cudaGraphicsRegisterFlagsWriteDiscard));
+	//cuda can write to the particle vertices via m_uboResource
+	cuCheck(cudaGraphicsGLRegisterBuffer(&m_uboResource, m_ubo, cudaGraphicsRegisterFlagsWriteDiscard));
 
 	//allocate memory for cuda particles, copy data into the first one
 	cuCheck(cudaMalloc((void**)&m_deviceParticlesIn, maxNumParticles * sizeof(Particle)));
 	cuCheck(cudaMalloc((void**)&m_deviceParticlesOut, maxNumParticles * sizeof(Particle)));
 	cuCheck(cudaMemcpy(m_deviceParticlesIn, particles, maxNumParticles * sizeof(Particle), cudaMemcpyHostToDevice));
-
-	free(particleVertices);
-	free(particleColors);
 	free(particles);
 
 	//copy simulation constants into constant cuda memory
@@ -384,11 +379,47 @@ SimulationScene::SimulationScene()
 SimulationScene::~SimulationScene()
 {
 	glDeleteProgram(m_program);
-	glDeleteBuffers(2, m_vbo);
+	glDeleteBuffers(1, &m_vbo);
 	glDeleteVertexArrays(1, &m_vao);
+	glDeleteBuffers(1, &m_ubo);
 
 	cuCheck(cudaFree(m_deviceParticlesIn));
 	cuCheck(cudaFree(m_deviceParticlesOut));
+}
+
+void SimulationScene::spawnParticles(const pVec& pos, cudaStream_t stream)
+{
+	Particle newParticles[numParticlesToSpawn];
+	const unsigned int newParticleCount = std::min(m_numParticles + numParticlesToSpawn, maxNumParticles);
+	const unsigned int numNewParticles = newParticleCount - m_numParticles;
+
+	if (numNewParticles != 0)
+	{
+		std::uniform_real_distribution<float> redDis = std::uniform_real_distribution<float>(particleRedRange.x, particleRedRange.y);
+		std::uniform_real_distribution<float> greenDis = std::uniform_real_distribution<float>(particleGreenRange.x, particleGreenRange.y);
+		std::uniform_real_distribution<float> blueDis = std::uniform_real_distribution<float>(particleBlueRange.x, particleBlueRange.y);
+
+		//spawn particles along the circumference of a circle
+		if (numNewParticles == 1)
+		{
+			newParticles[0].position = pos;
+			newParticles[0].velocity = pVec(0.0f);
+		}
+		else
+		{
+			const float angleIncrement = 6.2832f / numNewParticles;
+			const float circleRadius = numNewParticles * 2.0f;
+			for (unsigned int i = 0; i < numNewParticles; i++)
+			{
+				newParticles[i].position = pos + pVec(cos(i * angleIncrement) * circleRadius, sin(i * angleIncrement) * circleRadius);
+				newParticles[i].velocity = pVec(0.0f);
+				newParticles[i].color = glm::vec4(redDis(rng), greenDis(rng), blueDis(rng), 1.0f);
+			}
+		}
+
+		cudaMemcpyAsync(m_deviceParticlesIn + m_numParticles, newParticles, sizeof(Particle) * numNewParticles, cudaMemcpyHostToDevice, stream);
+		m_numParticles = newParticleCount;
+	}
 }
 
 void SimulationScene::update(float deltaTime)
@@ -400,35 +431,7 @@ void SimulationScene::update(float deltaTime)
 
 	//spawn particles into scene based on user input
 	bool spawn = _window->mousePressed(GLFW_MOUSE_BUTTON_3);
-	if (spawn)
-	{
-		Particle newParticles[numParticlesToSpawn];
-		unsigned int newParticleCount = std::min(m_numParticles + numParticlesToSpawn, maxNumParticles);
-		unsigned int numNewParticles = newParticleCount - m_numParticles;
-
-		if (numNewParticles != 0)
-		{
-			//spawn particles along the circumference of a circle
-			if (numNewParticles == 1)
-			{
-				newParticles[0].position = pos;
-				newParticles[0].velocity = pVec(0.0f);
-			}
-			else
-			{
-				float angleIncrement = 6.2832f / numNewParticles;
-				float circleRadius = numNewParticles * 2.0f;
-				for (unsigned int i = 0; i < numNewParticles; i++)
-				{
-					newParticles[i].position = pos + pVec(cos(i * angleIncrement) * circleRadius, sin(i * angleIncrement) * circleRadius);
-					newParticles[i].velocity = pVec(0.0f);
-				}
-			}
-
-			cudaMemcpyAsync(m_deviceParticlesIn + m_numParticles, newParticles, sizeof(Particle) * numNewParticles, cudaMemcpyHostToDevice, stream);
-			m_numParticles = newParticleCount;
-		}
-	}
+	if (spawn) spawnParticles(pos, stream);
 
 	dim3 block1D(ceil((float)m_numParticles / (float)m_maxNumThreads));
 	dim3 thread1D(std::min(m_numParticles, m_maxNumThreads));
@@ -445,13 +448,13 @@ void SimulationScene::update(float deltaTime)
 	//main physics computation; reads from particlesIn, stores results in particlesOut
 	cudaRun<<<block2D,thread2D,0,stream>>>(m_deviceParticlesIn, m_deviceParticlesOut, m_numParticles, deltaTime);
 
-	//map opengl verts into memory; reads from particlesOut, stores results in the VBO
-	pVec* particleVertices;
+	//map opengl particles into memory; reads from particlesOut, stores results in the UBO
+	Particle* particles;
 	size_t size;
-	cuCheck(cudaGraphicsMapResources(1, &m_vboResource, stream));
-	cuCheck(cudaGraphicsResourceGetMappedPointer((void**)&particleVertices, &size, m_vboResource));
-	cudaUpdateInfo<<<block1D,thread1D,0,stream>>>(m_deviceParticlesOut, particleVertices, m_numParticles, deltaTime);
-	cuCheck(cudaGraphicsUnmapResources(1, &m_vboResource, stream));
+	cuCheck(cudaGraphicsMapResources(1, &m_uboResource, stream));
+	cuCheck(cudaGraphicsResourceGetMappedPointer((void**)&particles, &size, m_uboResource));
+	cuCheck(cudaMemcpyAsync(particles, m_deviceParticlesOut, sizeof(Particle) * m_numParticles, cudaMemcpyDeviceToDevice, stream));
+	cuCheck(cudaGraphicsUnmapResources(1, &m_uboResource, stream));
 
 	//particlesOut will become particlesIn for the next iteration
 	swapDeviceParticles();
@@ -461,7 +464,7 @@ void SimulationScene::update(float deltaTime)
 	glm::ivec2 frameBufferSize = _window->getFramebufferSize();
 	glm::mat4 view_proj = glm::ortho((float)-frameBufferSize.x / 2, (float)frameBufferSize.x / 2, (float)-frameBufferSize.y / 2, (float)frameBufferSize.y / 2);
 	glUniformMatrix4fv(0, 1, false, (GLfloat*)&view_proj);
-
+	
 	cuCheck(cudaStreamSynchronize(stream));
 	cuCheck(cudaStreamDestroy(stream));
 }
@@ -469,12 +472,12 @@ void SimulationScene::update(float deltaTime)
 void SimulationScene::render()
 {
 	glClear(GL_COLOR_BUFFER_BIT);
-	glDrawArrays(GL_POINTS, 0, m_numParticles);
+	glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, displayParticleVertices, m_numParticles);
 }
 
 void SimulationScene::switchFrom(const std::string& previousScene, void* data)
 {
 	glBindVertexArray(m_vao);
+	glBindBufferBase(GL_UNIFORM_BUFFER, 0, m_ubo);
 	glUseProgram(m_program);
-	glPointSize(displayParticleHalfWidth * 2.0f);
 }
