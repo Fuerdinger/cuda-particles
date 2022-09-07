@@ -55,6 +55,9 @@ const SimulationScene::pVec SimulationScene::velocityDullingFactor = SimulationS
 //velocity will be dulled this many times a second
 const float SimulationScene::velocityDullingFactorRate = 60.0f;
 
+//how elastic/inelastic the particle collisions are; 0.0f = inelastic, 1.0f = elastic
+const float SimulationScene::restitutionCoefficient = 0.2f;
+
 //constant force applied to simulation
 const SimulationScene::pVec SimulationScene::gravity = SimulationScene::pVec(0.0f, -9.81f);
 
@@ -95,19 +98,20 @@ void cudaErrorCheck(cudaError_t result, const char* func, int line, const char* 
 __constant__ float d_particleRadius;
 __constant__ SimulationScene::pVec d_velocityDullingFactor;
 __constant__ float d_velocityDullingFactorRate;
+__constant__ float d_restitutionCoefficient;
 __constant__ SimulationScene::pVec d_gravity;
 __constant__ SimulationScene::pVec d_boundMin;
 __constant__ SimulationScene::pVec d_boundMax;
+__shared__ SimulationScene::pVec d_velocityDelta;
 __shared__ SimulationScene::pVec d_positionDelta;
 
-__device__ float getDistanceSquared(const SimulationScene::pVec& particle)
+__device__ float cudaDotProduct(const SimulationScene::pVec& particle1, const SimulationScene::pVec& particle2)
 {
 	float sum = 0.0f;
 	#pragma unroll
 	for (char i = 0; i < PVEC_DIM; i++)
 	{
-		const float val = particle[i];
-		sum += val * val;
+		sum += particle1[i] * particle2[i];
 	}
 	return sum;
 }
@@ -139,22 +143,25 @@ __global__ void cudaRun(
 	const unsigned int numParticles,
 	const float deltaTime)
 {
-	if (threadIdx.x == 0) d_positionDelta = SimulationScene::pVec(0.0f);
+	if (threadIdx.x == 0) { d_velocityDelta = SimulationScene::pVec(0.0f); d_positionDelta = SimulationScene::pVec(0.0f); }
 	__syncthreads();
 
 	const unsigned int index = blockIdx.x;
 	const SimulationScene::Particle in = particlesIn[index];
 	SimulationScene::Particle* const out = particlesOut + index;
 
-	SimulationScene::pVec position = in.position;
-	SimulationScene::pVec velocity = in.velocity;
-	position += velocity * deltaTime;
+	const SimulationScene::pVec inVelocity = in.velocity;
+	const SimulationScene::pVec inPosition = in.position + inVelocity * deltaTime;
 
+	//get particles to check to check for collisions
 	const unsigned int numOtherParticles = cudaCeil((float)numParticles / (float)blockDim.x);
 	const unsigned int firstOtherParticle = threadIdx.x * numOtherParticles;
 	const unsigned int lastOtherParticle = cudaMin(firstOtherParticle + numOtherParticles, numParticles);
 
+	//compute velocity based on colliding particles
+	SimulationScene::pVec velocityDelta = SimulationScene::pVec(0.0f);
 	SimulationScene::pVec positionDelta = SimulationScene::pVec(0.0f);
+
 	for (unsigned int i = firstOtherParticle; i < lastOtherParticle; i++)
 	{
 		if (i == index) continue;
@@ -162,9 +169,10 @@ __global__ void cudaRun(
 
 		//if the distance between the two circle centerpoints is less than the sum
 		//of the radii, then they must be overlapping.
-		const SimulationScene::pVec otherPos = other.position + other.velocity * deltaTime;
-		const SimulationScene::pVec delta = position - otherPos;
-		const float distanceSqr = getDistanceSquared(delta);
+		const SimulationScene::pVec otherVelocity = other.velocity;
+		const SimulationScene::pVec otherPos = other.position + otherVelocity * deltaTime;
+		const SimulationScene::pVec delta = inPosition - otherPos;
+		const float distanceSqr = cudaDotProduct(delta, delta);
 		const float radiusSum = d_particleRadius + d_particleRadius;
 		const float radiusSumSqr = radiusSum * radiusSum;
 
@@ -177,11 +185,19 @@ __global__ void cudaRun(
 			const SimulationScene::pVec overlappingDelta = (delta / distance) * overlappingDistance;
 			const SimulationScene::pVec dis = overlappingDelta * 0.5f;
 			positionDelta += dis;
+
+			//if the particles are sufficiently far enough away, update velocities too
+			if (distanceSqr > 0.001f)
+			{
+				//elastic collision formula: https://en.wikipedia.org/wiki/Elastic_collision
+				velocityDelta += d_restitutionCoefficient * -cudaDotProduct(inVelocity - otherVelocity, delta) * delta / distanceSqr;
+			}
 		}
 	}
 	#pragma unroll
 	for (char i = 0; i < PVEC_DIM; i++)
 	{
+		atomicAdd(&d_velocityDelta[i], velocityDelta[i]);
 		atomicAdd(&d_positionDelta[i], positionDelta[i]);
 	}
 	__syncthreads();
@@ -189,27 +205,36 @@ __global__ void cudaRun(
 	//only 1 thread should do this part
 	if (threadIdx.x == 0)
 	{
-		//collision update
-		position += d_positionDelta;
-
-		//update velocity too (results in less particle sticky-ness)
-		velocity += d_positionDelta;
+		//velocity becomes the summed result of the potential elastic collisions
+		SimulationScene::pVec outVelocity = inVelocity + d_velocityDelta;
 
 		//dull the velocity and apply force of gravity
-		velocity *= cudaPow(d_velocityDullingFactor, deltaTime * d_velocityDullingFactorRate);
-		velocity += d_gravity * deltaTime;
+		outVelocity *= cudaPow(d_velocityDullingFactor, deltaTime * d_velocityDullingFactorRate);
+		outVelocity += d_gravity * deltaTime;
+
+		//position calculated based on velocity and sum of overlaps
+		SimulationScene::pVec outPosition = in.position + outVelocity * deltaTime + d_positionDelta;
 
 		//ensure the particle hasn't left the simulation bounds
 		#pragma unroll
 		for (char i = 0; i < PVEC_DIM; i++)
 		{
-			if (position[i] < d_boundMin[i]) { position[i] = d_boundMin[i]; velocity[i] = 0.0f; }
-			else if (position[i] > d_boundMax[i])	{ position[i] = d_boundMax[i]; velocity[i] = 0.0f; }
+			//not completely elastic; is dulled
+			if (outPosition[i] < d_boundMin[i])
+			{
+				outPosition[i] = d_boundMin[i]; 
+				outVelocity[i] *= -d_restitutionCoefficient;
+			}
+			else if (outPosition[i] > d_boundMax[i])
+			{
+				outPosition[i] = d_boundMax[i];
+				outVelocity[i] *= -d_restitutionCoefficient;
+			}
 		}
 
 		//finally store results
-		out->position = position;
-		out->velocity = velocity;
+		out->position = outPosition;
+		out->velocity = outVelocity;
 		out->color = in.color;
 	}
 }
@@ -234,7 +259,7 @@ __global__ void cudaExplode(
 
 	//apply a velocity based on the vector from the explosion to particle
 	const SimulationScene::pVec dis = in->position - pos;
-	const float distanceSqr = getDistanceSquared(dis);
+	const float distanceSqr = cudaDotProduct(dis, dis);
 	if (distanceSqr < d_maxExplodeRange * d_maxExplodeRange)
 	{
 		//force is added (rather than assigned) to ensure realism of particles far away from explosion
@@ -258,7 +283,7 @@ __global__ void cudaSuction(
 
 	//apply a velocity based on the vector from the suction to particle
 	const SimulationScene::pVec dis = in->position - pos;
-	const float distanceSqr = getDistanceSquared(dis);
+	const float distanceSqr = cudaDotProduct(dis, dis);
 	if (distanceSqr < d_maxSuctionRange * d_maxSuctionRange)
 	{
 		//force is assigned (rather than added) to prevent particle velocities from getting too high over time
@@ -333,9 +358,9 @@ SimulationScene::SimulationScene()
 	glBindVertexArray(m_vao);
 	glGenBuffers(1, &m_vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
-	glBufferData(GL_ARRAY_BUFFER, displayParticleVertices * sizeof(pVec), circlePoints, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, displayParticleVertices * sizeof(glm::vec2), circlePoints, GL_STATIC_DRAW);
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, PVEC_DIM, GL_FLOAT, GL_FALSE, 0, NULL);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, NULL);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
 	free(circlePoints);
@@ -353,6 +378,7 @@ SimulationScene::SimulationScene()
 	cuCheck(cudaMemcpyToSymbol(d_particleRadius, &particleRadius, sizeof(float), 0, cudaMemcpyHostToDevice));
 	cuCheck(cudaMemcpyToSymbol(d_velocityDullingFactor, &velocityDullingFactor, sizeof(pVec), 0, cudaMemcpyHostToDevice));
 	cuCheck(cudaMemcpyToSymbol(d_velocityDullingFactorRate, &velocityDullingFactorRate, sizeof(float), 0, cudaMemcpyHostToDevice));
+	cuCheck(cudaMemcpyToSymbol(d_restitutionCoefficient, &restitutionCoefficient, sizeof(float), 0, cudaMemcpyHostToDevice));
 	cuCheck(cudaMemcpyToSymbol(d_gravity, &gravity, sizeof(pVec), 0, cudaMemcpyHostToDevice));
 	cuCheck(cudaMemcpyToSymbol(d_boundMin, &boundMin, sizeof(pVec), 0, cudaMemcpyHostToDevice));
 	cuCheck(cudaMemcpyToSymbol(d_boundMax, &boundMax, sizeof(pVec), 0, cudaMemcpyHostToDevice));

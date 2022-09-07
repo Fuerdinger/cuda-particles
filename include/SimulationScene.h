@@ -52,6 +52,7 @@ private:
 	static const float particleRadius;
 	static const pVec velocityDullingFactor;
 	static const float velocityDullingFactorRate;
+	static const float restitutionCoefficient;
 	static const pVec gravity;
 	static const pVec boundMin;
 	static const pVec boundMax;
