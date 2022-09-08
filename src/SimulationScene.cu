@@ -27,7 +27,7 @@ THE SOFTWARE.
 #define PVEC_DIM (sizeof(SimulationScene::pVec) / sizeof(float))
 
 //number of particles in the simulation
-const unsigned int SimulationScene::maxNumParticles = 2048;
+const unsigned int SimulationScene::maxNumParticles = 5120;
 
 //number of particles to spawn when user clicks on screen
 const unsigned int SimulationScene::numParticlesToSpawn = 5;
@@ -337,11 +337,11 @@ SimulationScene::SimulationScene()
 		particles[i].color = glm::vec4(redDis(rng), greenDis(rng), blueDis(rng), 1.0f);
 	};
 
-	//put the particle data into a UBO
-	glGenBuffers(1, &m_ubo);
-	glBindBuffer(GL_UNIFORM_BUFFER, m_ubo);
-	glBufferData(GL_UNIFORM_BUFFER, maxNumParticles * sizeof(Particle), particles, GL_DYNAMIC_COPY);
-	glBindBuffer(GL_UNIFORM_BUFFER, 0);
+	//put the particle data into a SSBO
+	glGenBuffers(1, &m_ssbo);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_ssbo);
+	glBufferData(GL_SHADER_STORAGE_BUFFER, maxNumParticles * sizeof(Particle), particles, GL_DYNAMIC_COPY);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
 	//generate triangle fan of circle vertices
 	glm::vec2* circlePoints = (glm::vec2*)malloc(displayParticleVertices * sizeof(glm::vec2));
@@ -365,8 +365,8 @@ SimulationScene::SimulationScene()
 	glBindVertexArray(0);
 	free(circlePoints);
 
-	//cuda can write to the particle vertices via m_uboResource
-	cuCheck(cudaGraphicsGLRegisterBuffer(&m_uboResource, m_ubo, cudaGraphicsRegisterFlagsWriteDiscard));
+	//cuda can write to the particle vertices via m_ssboResource
+	cuCheck(cudaGraphicsGLRegisterBuffer(&m_ssboResource, m_ssbo, cudaGraphicsRegisterFlagsWriteDiscard));
 
 	//allocate memory for cuda particles, copy data into the first one
 	cuCheck(cudaMalloc((void**)&m_deviceParticlesIn, maxNumParticles * sizeof(Particle)));
@@ -407,7 +407,7 @@ SimulationScene::~SimulationScene()
 	glDeleteProgram(m_program);
 	glDeleteBuffers(1, &m_vbo);
 	glDeleteVertexArrays(1, &m_vao);
-	glDeleteBuffers(1, &m_ubo);
+	glDeleteBuffers(1, &m_ssbo);
 
 	cuCheck(cudaFree(m_deviceParticlesIn));
 	cuCheck(cudaFree(m_deviceParticlesOut));
@@ -474,13 +474,13 @@ void SimulationScene::update(float deltaTime)
 	//main physics computation; reads from particlesIn, stores results in particlesOut
 	cudaRun<<<block2D,thread2D,0,stream>>>(m_deviceParticlesIn, m_deviceParticlesOut, m_numParticles, deltaTime);
 
-	//map opengl particles into memory; reads from particlesOut, stores results in the UBO
+	//map opengl particles into memory; reads from particlesOut, stores results in the SSBO
 	Particle* particles;
 	size_t size;
-	cuCheck(cudaGraphicsMapResources(1, &m_uboResource, stream));
-	cuCheck(cudaGraphicsResourceGetMappedPointer((void**)&particles, &size, m_uboResource));
+	cuCheck(cudaGraphicsMapResources(1, &m_ssboResource, stream));
+	cuCheck(cudaGraphicsResourceGetMappedPointer((void**)&particles, &size, m_ssboResource));
 	cuCheck(cudaMemcpyAsync(particles, m_deviceParticlesOut, sizeof(Particle) * m_numParticles, cudaMemcpyDeviceToDevice, stream));
-	cuCheck(cudaGraphicsUnmapResources(1, &m_uboResource, stream));
+	cuCheck(cudaGraphicsUnmapResources(1, &m_ssboResource, stream));
 
 	//particlesOut will become particlesIn for the next iteration
 	swapDeviceParticles();
@@ -504,6 +504,6 @@ void SimulationScene::render()
 void SimulationScene::switchFrom(const std::string& previousScene, void* data)
 {
 	glBindVertexArray(m_vao);
-	glBindBufferBase(GL_UNIFORM_BUFFER, 0, m_ubo);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_ssbo);
 	glUseProgram(m_program);
 }

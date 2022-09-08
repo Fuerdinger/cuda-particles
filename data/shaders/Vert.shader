@@ -33,7 +33,7 @@ struct Particle
 	vec4 color;
 };
 
-layout(std140, binding = 0) uniform Particles
+layout(std140, binding = 0) readonly buffer Particles
 {
 	Particle particles[2048];
 };

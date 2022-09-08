@@ -73,8 +73,8 @@ private:
 	//graphics resources
 	GLuint m_vao;
 	GLuint m_vbo;
-	GLuint m_ubo;
-	cudaGraphicsResource_t m_uboResource;
+	GLuint m_ssbo;
+	cudaGraphicsResource_t m_ssboResource;
 	GLuint m_program;
 
 	//helpers
