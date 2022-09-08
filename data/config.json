@@ -1,0 +1,56 @@
+{
+	//number of particles in the simulation
+	"maxNumParticles": 5120,
+
+	//number of particles to spawn when user clicks on screen
+	"numParticlesToSpawn": 5,
+
+	//number of particles which should already be in scene at start
+	"numParticlesAtStart": 0,
+
+	//radius of the particle to render
+	"displayParticleRadius": 5.0,
+
+	//number of vertices on the circumference of a particle's circle
+	//(-2 to include origin and first vertex twice)
+	"displayParticleVertices": 12,
+
+	//color value ranges for the particles
+	"particleRedRange": [ 0.0, 0.05 ],
+	"particleGreenRange": [ 0.0, 0.1 ],
+	"particleBlueRange": [ 0.65, 1.0 ],
+
+	//radius of the particle in the simulation
+	"particleRadius": 5.0,
+
+	//how much to multiply velocity by each frame
+	"velocityDullingFactor": [ 0.98, 1.0 ],
+
+	//velocity will be dulled this many times a second
+	"velocityDullingFactorRate": 60.0,
+
+	//how elastic/inelastic the particle collisions are
+	//0.0 = inelastic, 1.0 = elastic
+	"restitutionCoefficient": 0.2,
+
+	//constant force applied to simulation
+	"gravity": [ 0.0, -9.81 ],
+
+	//bottom left corner of simulation
+	"boundMin": [ -250.0, -250.0 ],
+
+	//top right corner of simulation
+	"boundMax": [ 250.0, 250.0 ],
+
+	//distance where a particle will be impacted by an explosion
+	"maxExplodeRange": 50.0,
+
+	//the velocity of a particle right next to an explosion (tapers off as it is farther away)
+	"maxExplodeForce": 20.0,
+
+	//distance where a particle will be impacted by suction
+	"maxSuctionRange": 100.0,
+
+	//the velocity of a particle right next to the suction (tapers off as it is farther away)
+	"maxSuctionForce": 10.0
+}

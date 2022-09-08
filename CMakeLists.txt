@@ -63,6 +63,7 @@ find_package(glfw3 REQUIRED)
 find_package(glm REQUIRED)
 find_package(SFML COMPONENTS audio REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb_image.h" "stb_image_write.h")
+find_package(nlohmann_json REQUIRED)
 
 # Specify source/header files and create the executable
 # These are specified as vars to keep them separate from ${SOURCES} and ${INCLUDE_DIRECTORIES}
@@ -93,6 +94,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE glfw)
 target_link_libraries(${PROJECT_NAME} PRIVATE glm::glm)
 target_link_libraries(${PROJECT_NAME} PRIVATE sfml-audio)
 target_include_directories(${PROJECT_NAME} PRIVATE ${STB_INCLUDE_DIRS})
+target_include_directories(${PROJECT_NAME} PRIVATE nlohmann_json::nlohmann_json)
 
 # Use doxygen to generate the documentation
 find_package(Doxygen)

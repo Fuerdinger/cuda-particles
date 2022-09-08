@@ -34,7 +34,11 @@ int main()
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif
 
+	std::fstream configFile("config.json", std::ios::in);
+	nlohmann::json config = nlohmann::json::parse(configFile, nullptr, true, true);
+	configFile.close();
+
 	SceneManager manager;
 	manager.build();
-	manager.run({ new SimulationScene() });
+	manager.run({ new SimulationScene(config) });
 }

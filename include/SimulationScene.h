@@ -40,26 +40,30 @@ public:
 	};
 
 private:
-	//see the src file for what these values do
-	static const unsigned int maxNumParticles;
-	static const unsigned int numParticlesToSpawn;
-	static const unsigned int numParticlesAtStart;
-	static const float displayParticleRadius;
-	static const unsigned int displayParticleVertices;
-	static const glm::vec2 particleRedRange;
-	static const glm::vec2 particleGreenRange;
-	static const glm::vec2 particleBlueRange;
-	static const float particleRadius;
-	static const pVec velocityDullingFactor;
-	static const float velocityDullingFactorRate;
-	static const float restitutionCoefficient;
-	static const pVec gravity;
-	static const pVec boundMin;
-	static const pVec boundMax;
-	static const float maxExplodeRange;
-	static const float maxExplodeForce;
-	static const float maxSuctionRange;
-	static const float maxSuctionForce;
+	//see config.json for what these values do
+	struct Config
+	{
+		unsigned int maxNumParticles;
+		unsigned int numParticlesToSpawn;
+		unsigned int numParticlesAtStart;
+		float displayParticleRadius;
+		unsigned int displayParticleVertices;
+		glm::vec2 particleRedRange;
+		glm::vec2 particleGreenRange;
+		glm::vec2 particleBlueRange;
+		float particleRadius;
+		pVec velocityDullingFactor;
+		float velocityDullingFactorRate;
+		float restitutionCoefficient;
+		pVec gravity;
+		pVec boundMin;
+		pVec boundMax;
+		float maxExplodeRange;
+		float maxExplodeForce;
+		float maxSuctionRange;
+		float maxSuctionForce;
+		Config(nlohmann::json& json);
+	} const m_cfg;
 
 	//number of blocks & threads we can have, at most
 	unsigned int m_maxNumBlocks;
@@ -69,6 +73,9 @@ private:
 	Particle* m_deviceParticlesIn;
 	Particle* m_deviceParticlesOut;
 	unsigned int m_numParticles;
+
+	//CPU buffer of particles for spawning
+	Particle* m_newParticles;
 
 	//graphics resources
 	GLuint m_vao;
@@ -83,7 +90,7 @@ private:
 	void spawnParticles(const pVec& pos, cudaStream_t stream);
 
 public:
-	SimulationScene();
+	SimulationScene(nlohmann::json& config);
 	~SimulationScene();
 
 	void update(float deltaTime);

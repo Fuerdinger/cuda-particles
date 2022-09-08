@@ -6,6 +6,7 @@
 		"glm",
 		"sfml",
 		"stb",
-		"glad"
+		"glad",
+		"nlohmann-json"
 	]
 }

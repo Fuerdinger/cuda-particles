@@ -26,59 +26,6 @@ THE SOFTWARE.
 
 #define PVEC_DIM (sizeof(SimulationScene::pVec) / sizeof(float))
 
-//number of particles in the simulation
-const unsigned int SimulationScene::maxNumParticles = 5120;
-
-//number of particles to spawn when user clicks on screen
-const unsigned int SimulationScene::numParticlesToSpawn = 5;
-
-//number of particles which should already be in scene at start
-const unsigned int SimulationScene::numParticlesAtStart = 0;
-
-//radius of the particle to render
-const float SimulationScene::displayParticleRadius = 5.0f;
-
-//number of vertices on the circumference of a particle's circle (-2 to include origin and first vertex twice)
-const unsigned int SimulationScene::displayParticleVertices = 12;
-
-//color value ranges for the particles
-const glm::vec2 SimulationScene::particleRedRange = glm::vec2(0.0f, 0.05f);
-const glm::vec2 SimulationScene::particleGreenRange = glm::vec2(0.0f, 0.1f);
-const glm::vec2 SimulationScene::particleBlueRange = glm::vec2(0.65f, 1.0f);
-
-//radius of the particle in the simulation
-const float SimulationScene::particleRadius = 5.0f;
-
-//how much to multiply velocity by each frame
-const SimulationScene::pVec SimulationScene::velocityDullingFactor = SimulationScene::pVec(0.98f, 1.0f);
-
-//velocity will be dulled this many times a second
-const float SimulationScene::velocityDullingFactorRate = 60.0f;
-
-//how elastic/inelastic the particle collisions are; 0.0f = inelastic, 1.0f = elastic
-const float SimulationScene::restitutionCoefficient = 0.2f;
-
-//constant force applied to simulation
-const SimulationScene::pVec SimulationScene::gravity = SimulationScene::pVec(0.0f, -9.81f);
-
-//bottom left corner of simulation
-const SimulationScene::pVec SimulationScene::boundMin = SimulationScene::pVec(-250.0f, -250.0f);
-
-//top right corner of simulation
-const SimulationScene::pVec SimulationScene::boundMax = SimulationScene::pVec(250.0f, 250.0f);
-
-//distance where a particle will be impacted by an explosion
-const float SimulationScene::maxExplodeRange = 50.0f;
-
-//the velocity of a particle right next to an explosion (tapers off as it is farther away)
-const float SimulationScene::maxExplodeForce = 20.0f;
-
-//distance where a particle will be impacted by suction
-const float SimulationScene::maxSuctionRange = 100.0f;
-
-//the velocity of a particle right next to the suction (tapers off as it is farther away)
-const float SimulationScene::maxSuctionForce = 10.0f;
-
 std::mt19937_64 rng;
 
 void cudaErrorCheck(cudaError_t result, const char* func, int line, const char* file)
@@ -309,22 +256,57 @@ SimulationScene::pVec SimulationScene::getCursorPos() const
 	return pos;
 }
 
-SimulationScene::SimulationScene()
+SimulationScene::Config::Config(nlohmann::json& json)
+{
+	maxNumParticles = json["maxNumParticles"];
+	numParticlesToSpawn = json["numParticlesToSpawn"];
+	numParticlesAtStart = json["numParticlesAtStart"];
+	displayParticleRadius = json["displayParticleRadius"];
+	displayParticleVertices = json["displayParticleVertices"];
+
+	for (char i = 0; i < 2; i++)
+	{
+		particleRedRange[i] = json["particleRedRange"][i];
+		particleGreenRange[i] = json["particleGreenRange"][i];
+		particleBlueRange[i] = json["particleBlueRange"][i];
+	}
+
+	for (char i = 0; i < PVEC_DIM; i++)
+	{
+		velocityDullingFactor[i] = json["velocityDullingFactor"][i];
+		gravity[i] = json["gravity"][i];
+		boundMin[i] = json["boundMin"][i];
+		boundMax[i] = json["boundMax"][i];
+	}
+
+	particleRadius = json["particleRadius"];
+	velocityDullingFactorRate = json["velocityDullingFactorRate"];
+	restitutionCoefficient = json["restitutionCoefficient"];
+
+	maxExplodeRange = json["maxExplodeRange"];
+	maxExplodeForce = json["maxExplodeForce"];
+	maxSuctionRange = json["maxSuctionRange"];
+	maxSuctionForce = json["maxSuctionForce"];
+}
+
+SimulationScene::SimulationScene(nlohmann::json& config)
 	: Scene("Simulation")
+	, m_cfg(config)
 {
 	//generate distributions based on size of simulation bounding box, expected color values
 	std::uniform_real_distribution<float> dis[PVEC_DIM];
 	for (char i = 0; i < PVEC_DIM; i++)
 	{
-		dis[i] = std::uniform_real_distribution<float>(boundMin[i], boundMax[i]);
+		dis[i] = std::uniform_real_distribution<float>(m_cfg.boundMin[i], m_cfg.boundMax[i]);
 	}
-	std::uniform_real_distribution<float> redDis = std::uniform_real_distribution<float>(particleRedRange.x, particleRedRange.y);
-	std::uniform_real_distribution<float> greenDis = std::uniform_real_distribution<float>(particleGreenRange.x, particleGreenRange.y);
-	std::uniform_real_distribution<float> blueDis = std::uniform_real_distribution<float>(particleBlueRange.x, particleBlueRange.y);
+	std::uniform_real_distribution<float> redDis = std::uniform_real_distribution<float>(m_cfg.particleRedRange.x, m_cfg.particleRedRange.y);
+	std::uniform_real_distribution<float> greenDis = std::uniform_real_distribution<float>(m_cfg.particleGreenRange.x, m_cfg.particleGreenRange.y);
+	std::uniform_real_distribution<float> blueDis = std::uniform_real_distribution<float>(m_cfg.particleBlueRange.x, m_cfg.particleBlueRange.y);
 
-	m_numParticles = numParticlesAtStart;
+	m_numParticles = m_cfg.numParticlesAtStart;
 
-	Particle* particles = (Particle*)malloc(maxNumParticles * sizeof(Particle));
+	Particle* particles = (Particle*)malloc(m_cfg.maxNumParticles * sizeof(Particle));
+	m_newParticles = (Particle*)malloc(m_cfg.numParticlesToSpawn * sizeof(Particle));
 
 	//initialize random positions and colors
 	for (unsigned int i = 0; i < m_numParticles; i++)
@@ -340,17 +322,17 @@ SimulationScene::SimulationScene()
 	//put the particle data into a SSBO
 	glGenBuffers(1, &m_ssbo);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_ssbo);
-	glBufferData(GL_SHADER_STORAGE_BUFFER, maxNumParticles * sizeof(Particle), particles, GL_DYNAMIC_COPY);
+	glBufferData(GL_SHADER_STORAGE_BUFFER, m_cfg.maxNumParticles * sizeof(Particle), particles, GL_DYNAMIC_COPY);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
 	//generate triangle fan of circle vertices
-	glm::vec2* circlePoints = (glm::vec2*)malloc(displayParticleVertices * sizeof(glm::vec2));
-	float angleInterval = 6.283185f / (displayParticleVertices - 2);
+	glm::vec2* circlePoints = (glm::vec2*)malloc(m_cfg.displayParticleVertices * sizeof(glm::vec2));
+	float angleInterval = 6.283185f / (m_cfg.displayParticleVertices - 2);
 	circlePoints[0] = glm::vec2(0.0f, 0.0f);
-	for (unsigned int i = 1; i < displayParticleVertices; i++)
+	for (unsigned int i = 1; i < m_cfg.displayParticleVertices; i++)
 	{
 		const float angle = (i - 1) * angleInterval;
-		circlePoints[i] = glm::vec2(cos(angle) * displayParticleRadius, sin(angle) * displayParticleRadius);
+		circlePoints[i] = glm::vec2(cos(angle) * m_cfg.displayParticleRadius, sin(angle) * m_cfg.displayParticleRadius);
 	}
 
 	//VAO with 1 VBOs for the circle
@@ -358,7 +340,7 @@ SimulationScene::SimulationScene()
 	glBindVertexArray(m_vao);
 	glGenBuffers(1, &m_vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
-	glBufferData(GL_ARRAY_BUFFER, displayParticleVertices * sizeof(glm::vec2), circlePoints, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, m_cfg.displayParticleVertices * sizeof(glm::vec2), circlePoints, GL_STATIC_DRAW);
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, NULL);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -369,32 +351,32 @@ SimulationScene::SimulationScene()
 	cuCheck(cudaGraphicsGLRegisterBuffer(&m_ssboResource, m_ssbo, cudaGraphicsRegisterFlagsWriteDiscard));
 
 	//allocate memory for cuda particles, copy data into the first one
-	cuCheck(cudaMalloc((void**)&m_deviceParticlesIn, maxNumParticles * sizeof(Particle)));
-	cuCheck(cudaMalloc((void**)&m_deviceParticlesOut, maxNumParticles * sizeof(Particle)));
-	cuCheck(cudaMemcpy(m_deviceParticlesIn, particles, maxNumParticles * sizeof(Particle), cudaMemcpyHostToDevice));
+	cuCheck(cudaMalloc((void**)&m_deviceParticlesIn, m_cfg.maxNumParticles * sizeof(Particle)));
+	cuCheck(cudaMalloc((void**)&m_deviceParticlesOut, m_cfg.maxNumParticles * sizeof(Particle)));
+	cuCheck(cudaMemcpy(m_deviceParticlesIn, particles, m_cfg.maxNumParticles * sizeof(Particle), cudaMemcpyHostToDevice));
 	free(particles);
 
 	//copy simulation constants into constant cuda memory
-	cuCheck(cudaMemcpyToSymbol(d_particleRadius, &particleRadius, sizeof(float), 0, cudaMemcpyHostToDevice));
-	cuCheck(cudaMemcpyToSymbol(d_velocityDullingFactor, &velocityDullingFactor, sizeof(pVec), 0, cudaMemcpyHostToDevice));
-	cuCheck(cudaMemcpyToSymbol(d_velocityDullingFactorRate, &velocityDullingFactorRate, sizeof(float), 0, cudaMemcpyHostToDevice));
-	cuCheck(cudaMemcpyToSymbol(d_restitutionCoefficient, &restitutionCoefficient, sizeof(float), 0, cudaMemcpyHostToDevice));
-	cuCheck(cudaMemcpyToSymbol(d_gravity, &gravity, sizeof(pVec), 0, cudaMemcpyHostToDevice));
-	cuCheck(cudaMemcpyToSymbol(d_boundMin, &boundMin, sizeof(pVec), 0, cudaMemcpyHostToDevice));
-	cuCheck(cudaMemcpyToSymbol(d_boundMax, &boundMax, sizeof(pVec), 0, cudaMemcpyHostToDevice));
-	cuCheck(cudaMemcpyToSymbol(d_maxExplodeRange, &maxExplodeRange, sizeof(float), 0, cudaMemcpyHostToDevice));
-	cuCheck(cudaMemcpyToSymbol(d_maxExplodeForce, &maxExplodeForce, sizeof(float), 0, cudaMemcpyHostToDevice));
-	cuCheck(cudaMemcpyToSymbol(d_maxSuctionRange, &maxSuctionRange, sizeof(float), 0, cudaMemcpyHostToDevice));
-	cuCheck(cudaMemcpyToSymbol(d_maxSuctionForce, &maxSuctionForce, sizeof(float), 0, cudaMemcpyHostToDevice));
+	cuCheck(cudaMemcpyToSymbol(d_particleRadius, &m_cfg.particleRadius, sizeof(float), 0, cudaMemcpyHostToDevice));
+	cuCheck(cudaMemcpyToSymbol(d_velocityDullingFactor, &m_cfg.velocityDullingFactor, sizeof(pVec), 0, cudaMemcpyHostToDevice));
+	cuCheck(cudaMemcpyToSymbol(d_velocityDullingFactorRate, &m_cfg.velocityDullingFactorRate, sizeof(float), 0, cudaMemcpyHostToDevice));
+	cuCheck(cudaMemcpyToSymbol(d_restitutionCoefficient, &m_cfg.restitutionCoefficient, sizeof(float), 0, cudaMemcpyHostToDevice));
+	cuCheck(cudaMemcpyToSymbol(d_gravity, &m_cfg.gravity, sizeof(pVec), 0, cudaMemcpyHostToDevice));
+	cuCheck(cudaMemcpyToSymbol(d_boundMin, &m_cfg.boundMin, sizeof(pVec), 0, cudaMemcpyHostToDevice));
+	cuCheck(cudaMemcpyToSymbol(d_boundMax, &m_cfg.boundMax, sizeof(pVec), 0, cudaMemcpyHostToDevice));
+	cuCheck(cudaMemcpyToSymbol(d_maxExplodeRange, &m_cfg.maxExplodeRange, sizeof(float), 0, cudaMemcpyHostToDevice));
+	cuCheck(cudaMemcpyToSymbol(d_maxExplodeForce, &m_cfg.maxExplodeForce, sizeof(float), 0, cudaMemcpyHostToDevice));
+	cuCheck(cudaMemcpyToSymbol(d_maxSuctionRange, &m_cfg.maxSuctionRange, sizeof(float), 0, cudaMemcpyHostToDevice));
+	cuCheck(cudaMemcpyToSymbol(d_maxSuctionForce, &m_cfg.maxSuctionForce, sizeof(float), 0, cudaMemcpyHostToDevice));
 
 	//get properties from user's GPU to ensure maximum performance of simulation
 	cudaDeviceProp properties;
 	cuCheck(cudaGetDeviceProperties(&properties, 0));
 	m_maxNumBlocks = properties.maxGridSize[0];
 	m_maxNumThreads = properties.maxThreadsDim[0];
-	if (m_maxNumBlocks < maxNumParticles)
+	if (m_maxNumBlocks < m_cfg.maxNumParticles)
 	{
-		fprintf(stderr, "Error: gpu's max grid size is %d, which is too low for %d particles", m_maxNumBlocks, maxNumParticles);
+		fprintf(stderr, "Error: gpu's max grid size is %d, which is too low for %d particles", m_maxNumBlocks, m_cfg.maxNumParticles);
 		abort();
 	}
 
@@ -411,25 +393,25 @@ SimulationScene::~SimulationScene()
 
 	cuCheck(cudaFree(m_deviceParticlesIn));
 	cuCheck(cudaFree(m_deviceParticlesOut));
+	free(m_newParticles);
 }
 
 void SimulationScene::spawnParticles(const pVec& pos, cudaStream_t stream)
 {
-	Particle newParticles[numParticlesToSpawn];
-	const unsigned int newParticleCount = std::min(m_numParticles + numParticlesToSpawn, maxNumParticles);
+	const unsigned int newParticleCount = std::min(m_numParticles + m_cfg.numParticlesToSpawn, m_cfg.maxNumParticles);
 	const unsigned int numNewParticles = newParticleCount - m_numParticles;
 
 	if (numNewParticles != 0)
 	{
-		std::uniform_real_distribution<float> redDis = std::uniform_real_distribution<float>(particleRedRange.x, particleRedRange.y);
-		std::uniform_real_distribution<float> greenDis = std::uniform_real_distribution<float>(particleGreenRange.x, particleGreenRange.y);
-		std::uniform_real_distribution<float> blueDis = std::uniform_real_distribution<float>(particleBlueRange.x, particleBlueRange.y);
+		std::uniform_real_distribution<float> redDis = std::uniform_real_distribution<float>(m_cfg.particleRedRange.x, m_cfg.particleRedRange.y);
+		std::uniform_real_distribution<float> greenDis = std::uniform_real_distribution<float>(m_cfg.particleGreenRange.x, m_cfg.particleGreenRange.y);
+		std::uniform_real_distribution<float> blueDis = std::uniform_real_distribution<float>(m_cfg.particleBlueRange.x, m_cfg.particleBlueRange.y);
 
 		//spawn particles along the circumference of a circle
 		if (numNewParticles == 1)
 		{
-			newParticles[0].position = pos;
-			newParticles[0].velocity = pVec(0.0f);
+			m_newParticles[0].position = pos;
+			m_newParticles[0].velocity = pVec(0.0f);
 		}
 		else
 		{
@@ -437,13 +419,13 @@ void SimulationScene::spawnParticles(const pVec& pos, cudaStream_t stream)
 			const float circleRadius = numNewParticles * 2.0f;
 			for (unsigned int i = 0; i < numNewParticles; i++)
 			{
-				newParticles[i].position = pos + pVec(cos(i * angleIncrement) * circleRadius, sin(i * angleIncrement) * circleRadius);
-				newParticles[i].velocity = pVec(0.0f);
-				newParticles[i].color = glm::vec4(redDis(rng), greenDis(rng), blueDis(rng), 1.0f);
+				m_newParticles[i].position = pos + pVec(cos(i * angleIncrement) * circleRadius, sin(i * angleIncrement) * circleRadius);
+				m_newParticles[i].velocity = pVec(0.0f);
+				m_newParticles[i].color = glm::vec4(redDis(rng), greenDis(rng), blueDis(rng), 1.0f);
 			}
 		}
 
-		cudaMemcpyAsync(m_deviceParticlesIn + m_numParticles, newParticles, sizeof(Particle) * numNewParticles, cudaMemcpyHostToDevice, stream);
+		cudaMemcpyAsync(m_deviceParticlesIn + m_numParticles, m_newParticles, sizeof(Particle) * numNewParticles, cudaMemcpyHostToDevice, stream);
 		m_numParticles = newParticleCount;
 	}
 }
@@ -498,7 +480,7 @@ void SimulationScene::update(float deltaTime)
 void SimulationScene::render()
 {
 	glClear(GL_COLOR_BUFFER_BIT);
-	glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, displayParticleVertices, m_numParticles);
+	glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, m_cfg.displayParticleVertices, m_numParticles);
 }
 
 void SimulationScene::switchFrom(const std::string& previousScene, void* data)

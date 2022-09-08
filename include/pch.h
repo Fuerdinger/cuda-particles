@@ -67,6 +67,9 @@ THE SOFTWARE.
 #include <glm/gtx/matrix_decompose.hpp>
 #include <glm/gtx/quaternion.hpp>
 
+//JSON
+#include <nlohmann/json.hpp>
+
 //C runtime and STL
 #include <cstring>
 #include <string>
