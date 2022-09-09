@@ -22,7 +22,7 @@
 # THE SOFTWARE.
 #****************************************************************************
 
-cmake_minimum_required (VERSION 3.9)
+cmake_minimum_required (VERSION 3.24)
 
 # Sets up the toolchain for using vcpkg to download the packages in vcpkg.json
 if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
@@ -43,6 +43,14 @@ endif()
 
 # We want to export an executable that is dynamically linked against the CRT
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL" CACHE STRING "msvc runtime")
+
+# Debug builds will use a dynamically linked CUDA runtime, Release builds use a statically linked one
+set(CMAKE_CUDA_RUNTIME_LIBRARY "$<IF:$<CONFIG:Debug>,Shared,Static>" CACHE STRING "CUDA runtime")
+
+# Unless otherwise specified, build for all CUDA architectures to ensure maximum compatibility
+if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+  set(CMAKE_CUDA_ARCHITECTURES "all")
+endif()
 
 project("cuda-particles"
 	VERSION 1.0.0

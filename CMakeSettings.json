@@ -9,7 +9,8 @@
 			"installRoot": "${projectDir}\\install\\${name}",
 			"cmakeCommandArgs": "",
 			"buildCommandArgs": "",
-			"ctestCommandArgs": ""
+			"ctestCommandArgs": "",
+			"cmakeExecutable": "${env.CMAKE_PATH}\\bin\\cmake.exe"
 		},
 		{
 			"name": "x64-Release",
@@ -20,7 +21,8 @@
 			"cmakeCommandArgs": "",
 			"buildCommandArgs": "",
 			"ctestCommandArgs": "",
-			"inheritEnvironments": [ "msvc_x64_x64" ]
+			"inheritEnvironments": [ "msvc_x64_x64" ],
+			"cmakeExecutable": "${env.CMAKE_PATH}\\bin\\cmake.exe"
 		}
 	]
 }
