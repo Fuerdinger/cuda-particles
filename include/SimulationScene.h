@@ -39,6 +39,11 @@ public:
 		glm::vec4 color;
 	};
 
+	struct Collision
+	{
+		float force;
+	};
+
 private:
 	//see config.json for what these values do
 	struct Config
@@ -62,6 +67,12 @@ private:
 		float maxExplodeForce;
 		float maxSuctionRange;
 		float maxSuctionForce;
+		bool audioOn;
+		std::string audioFilePrefix;
+		unsigned int numSoundPlayers;
+		float maxPitch;
+		float minPitch;
+		float minPitchForce;
 		Config(nlohmann::json& json);
 	} const m_cfg;
 
@@ -77,12 +88,19 @@ private:
 	//CPU buffer of particles for spawning
 	Particle* m_newParticles;
 
+	//CPU and GPU buffer for collision data
+	Collision* m_deviceCollisions;
+	Collision* m_collisions;
+
 	//graphics resources
 	GLuint m_vao;
 	GLuint m_vbo;
 	GLuint m_ssbo;
 	cudaGraphicsResource_t m_ssboResource;
 	GLuint m_program;
+
+	//SFX players
+	std::vector<SoundPlayer*> m_sounds;
 
 	//helpers
 	void swapDeviceParticles();

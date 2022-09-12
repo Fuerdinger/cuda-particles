@@ -79,6 +79,7 @@ THE SOFTWARE.
 #include <chrono>
 #include <random>
 #include <fstream>
+#include <filesystem>
 
 //set warning level back to normal
 #pragma warning (pop)

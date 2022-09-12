@@ -51,6 +51,7 @@ __constant__ SimulationScene::pVec d_boundMin;
 __constant__ SimulationScene::pVec d_boundMax;
 __shared__ SimulationScene::pVec d_velocityDelta;
 __shared__ SimulationScene::pVec d_positionDelta;
+__shared__ float d_collisionForceDelta;
 
 __device__ float cudaDotProduct(const SimulationScene::pVec& particle1, const SimulationScene::pVec& particle2)
 {
@@ -87,15 +88,22 @@ __device__ unsigned int cudaMin(const unsigned int val1, const unsigned int val2
 __global__ void cudaRun(
 	const SimulationScene::Particle* const particlesIn,
 	SimulationScene::Particle* const particlesOut,
+	SimulationScene::Collision* const collisions,
 	const unsigned int numParticles,
 	const float deltaTime)
 {
-	if (threadIdx.x == 0) { d_velocityDelta = SimulationScene::pVec(0.0f); d_positionDelta = SimulationScene::pVec(0.0f); }
+	if (threadIdx.x == 0) 
+	{ 
+		d_velocityDelta = SimulationScene::pVec(0.0f);
+		d_positionDelta = SimulationScene::pVec(0.0f);
+		d_collisionForceDelta = 0.0f;
+	}
 	__syncthreads();
 
 	const unsigned int index = blockIdx.x;
 	const SimulationScene::Particle in = particlesIn[index];
 	SimulationScene::Particle* const out = particlesOut + index;
+	SimulationScene::Collision* const collision = collisions + index;
 
 	const SimulationScene::pVec inVelocity = in.velocity;
 	const SimulationScene::pVec inPosition = in.position + inVelocity * deltaTime;
@@ -105,9 +113,11 @@ __global__ void cudaRun(
 	const unsigned int firstOtherParticle = threadIdx.x * numOtherParticles;
 	const unsigned int lastOtherParticle = cudaMin(firstOtherParticle + numOtherParticles, numParticles);
 
-	//compute velocity based on colliding particles
 	SimulationScene::pVec velocityDelta = SimulationScene::pVec(0.0f);
 	SimulationScene::pVec positionDelta = SimulationScene::pVec(0.0f);
+	float collisionDelta = 0.0f;
+
+	//compute velocity/position based on colliding particles
 
 	for (unsigned int i = firstOtherParticle; i < lastOtherParticle; i++)
 	{
@@ -137,7 +147,9 @@ __global__ void cudaRun(
 			if (distanceSqr > 0.001f)
 			{
 				//elastic collision formula: https://en.wikipedia.org/wiki/Elastic_collision
-				velocityDelta += d_restitutionCoefficient * -cudaDotProduct(inVelocity - otherVelocity, delta) * delta / distanceSqr;
+				const float velocityMag = cudaDotProduct(inVelocity - otherVelocity, delta) / distanceSqr;
+				velocityDelta += d_restitutionCoefficient * -velocityMag * delta;
+				collisionDelta += velocityMag > 0.0f ? velocityMag : -1.0f * velocityMag;
 			}
 		}
 	}
@@ -147,6 +159,7 @@ __global__ void cudaRun(
 		atomicAdd(&d_velocityDelta[i], velocityDelta[i]);
 		atomicAdd(&d_positionDelta[i], positionDelta[i]);
 	}
+	atomicAdd(&d_collisionForceDelta, collisionDelta);
 	__syncthreads();
 
 	//only 1 thread should do this part
@@ -183,10 +196,16 @@ __global__ void cudaRun(
 		out->position = outPosition;
 		out->velocity = outVelocity;
 		out->color = in.color;
+		collision->force = d_collisionForceDelta;
 	}
 }
 
 __device__ float cudaLerp(const float x0, const float x1, const float t)
+{
+	return x0 + t * (x1 - x0);
+}
+
+float lerp(const float x0, const float x1, const float t)
 {
 	return x0 + t * (x1 - x0);
 }
@@ -287,12 +306,43 @@ SimulationScene::Config::Config(nlohmann::json& json)
 	maxExplodeForce = json["maxExplodeForce"];
 	maxSuctionRange = json["maxSuctionRange"];
 	maxSuctionForce = json["maxSuctionForce"];
+	audioOn = json["audioOn"];
+	audioFilePrefix = json["audioFilePrefix"];
+	numSoundPlayers = json["numSoundPlayers"];
+	maxPitch = json["maxPitch"];
+	minPitch = json["minPitch"];
+	minPitchForce = json["minPitchForce"];
 }
 
 SimulationScene::SimulationScene(nlohmann::json& config)
 	: Scene("Simulation")
 	, m_cfg(config)
 {
+	//load audio files
+	_sounds->setPath("sfx\\");
+	std::vector<std::string> soundNames;
+	for (const auto& file : std::filesystem::directory_iterator("sfx"))
+	{
+		std::filesystem::path path = file.path();
+		if (path.extension() == ".ogg")
+		{
+			std::string name = path.stem().string();
+			if (name.find(m_cfg.audioFilePrefix) != std::string::npos)
+			{
+				_sounds->loadSFX(name);
+				soundNames.push_back(name);
+			}
+		}
+	}
+	//create sound players for the audio files
+	const unsigned int numSoundPlayers = m_cfg.numSoundPlayers > 0 ? m_cfg.numSoundPlayers : soundNames.size();
+	m_sounds.reserve(numSoundPlayers);
+	for (unsigned int i = 0; i < numSoundPlayers; i++)
+	{
+		std::string soundName = soundNames[i % soundNames.size()];
+		m_sounds.push_back(_sounds->createSoundPlayer(soundName));
+	}
+
 	//generate distributions based on size of simulation bounding box, expected color values
 	std::uniform_real_distribution<float> dis[PVEC_DIM];
 	for (char i = 0; i < PVEC_DIM; i++)
@@ -307,6 +357,7 @@ SimulationScene::SimulationScene(nlohmann::json& config)
 
 	Particle* particles = (Particle*)malloc(m_cfg.maxNumParticles * sizeof(Particle));
 	m_newParticles = (Particle*)malloc(m_cfg.numParticlesToSpawn * sizeof(Particle));
+	m_collisions = (Collision*)malloc(m_cfg.maxNumParticles * sizeof(Collision));
 
 	//initialize random positions and colors
 	for (unsigned int i = 0; i < m_numParticles; i++)
@@ -317,6 +368,7 @@ SimulationScene::SimulationScene(nlohmann::json& config)
 		}
 		particles[i].velocity = pVec(0.0f);
 		particles[i].color = glm::vec4(redDis(rng), greenDis(rng), blueDis(rng), 1.0f);
+		m_collisions[i].force = 0.0f;
 	};
 
 	//put the particle data into a SSBO
@@ -356,6 +408,10 @@ SimulationScene::SimulationScene(nlohmann::json& config)
 	cuCheck(cudaMemcpy(m_deviceParticlesIn, particles, m_cfg.maxNumParticles * sizeof(Particle), cudaMemcpyHostToDevice));
 	free(particles);
 
+	//allocate memory for collision data
+	cuCheck(cudaMalloc((void**)&m_deviceCollisions, m_cfg.maxNumParticles * sizeof(Collision)));
+	cuCheck(cudaMemcpy(m_deviceCollisions, m_collisions, m_cfg.maxNumParticles * sizeof(Collision), cudaMemcpyHostToDevice));
+
 	//copy simulation constants into constant cuda memory
 	cuCheck(cudaMemcpyToSymbol(d_particleRadius, &m_cfg.particleRadius, sizeof(float), 0, cudaMemcpyHostToDevice));
 	cuCheck(cudaMemcpyToSymbol(d_velocityDullingFactor, &m_cfg.velocityDullingFactor, sizeof(pVec), 0, cudaMemcpyHostToDevice));
@@ -393,6 +449,8 @@ SimulationScene::~SimulationScene()
 
 	cuCheck(cudaFree(m_deviceParticlesIn));
 	cuCheck(cudaFree(m_deviceParticlesOut));
+	cuCheck(cudaFree(m_deviceCollisions));
+	free(m_collisions);
 	free(m_newParticles);
 }
 
@@ -454,7 +512,7 @@ void SimulationScene::update(float deltaTime)
 	else if (suction) cudaSuction<<<block1D, thread1D, 0, stream>>>(m_deviceParticlesIn, m_numParticles, deltaTime, pos);
 
 	//main physics computation; reads from particlesIn, stores results in particlesOut
-	cudaRun<<<block2D,thread2D,0,stream>>>(m_deviceParticlesIn, m_deviceParticlesOut, m_numParticles, deltaTime);
+	cudaRun<<<block2D,thread2D,0,stream>>>(m_deviceParticlesIn, m_deviceParticlesOut, m_deviceCollisions, m_numParticles, deltaTime);
 
 	//map opengl particles into memory; reads from particlesOut, stores results in the SSBO
 	Particle* particles;
@@ -475,6 +533,31 @@ void SimulationScene::update(float deltaTime)
 	
 	cuCheck(cudaStreamSynchronize(stream));
 	cuCheck(cudaStreamDestroy(stream));
+
+	//if audio output is enabled and sfx were loaded in
+	if (m_cfg.audioOn && m_sounds.size() > 0)
+	{
+		//get collision data, find highest velocity "force" from this iteration's collisions
+		cuCheck(cudaMemcpy(m_collisions, m_deviceCollisions, m_numParticles * sizeof(Collision), cudaMemcpyDeviceToHost));
+		float maxForce = 0.0f;
+		for (unsigned int i = 0; i < m_numParticles; i++)
+		{
+			if (m_collisions[i].force > maxForce) maxForce = m_collisions[i].force;
+		}
+		if (maxForce > 0.5f)
+		{
+			//if the highest force is sufficiently high, play a sound effect
+			std::uniform_int_distribution<unsigned int> soundDis = std::uniform_int_distribution<unsigned int>(0, m_sounds.size() - 1);
+			SoundPlayer* sound = m_sounds[soundDis(rng)];
+			if (sound->isPlaying() == false)
+			{
+				//biggest force = louder and lower pitch
+				sound->setVolume(maxForce);
+				sound->setPitch(lerp(m_cfg.maxPitch, m_cfg.minPitch, std::min(maxForce / m_cfg.minPitchForce, 1.0f)));
+				sound->play();
+			}
+		}
+	}
 }
 
 void SimulationScene::render()

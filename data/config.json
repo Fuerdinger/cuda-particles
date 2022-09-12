@@ -52,5 +52,21 @@
 	"maxSuctionRange": 100.0,
 
 	//the velocity of a particle right next to the suction (tapers off as it is farther away)
-	"maxSuctionForce": 10.0
+	"maxSuctionForce": 10.0,
+
+	//whether to play audio or not
+	"audioOn": true,
+
+	//only sound files which contain this in their filenames will be used; set to empty to load all sound files
+	"audioFilePrefix": "water",
+
+	//number of sounds which can play at once; set to 0 to make it default to number of sounds in sfx/
+	"numSoundPlayers": 12,
+
+	//the highest/lowest pitch an audio file may be played at
+	"maxPitch": 0.6,
+	"minPitch": 0.2,
+
+	//how high the velocity of 2 particles in a collision should be to play sfx at the lowest pitch
+	"minPitchForce": 100.0
 }
