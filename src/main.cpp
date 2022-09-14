@@ -25,19 +25,57 @@ THE SOFTWARE.
 #include "SimulationScene.h"
 
 #if defined(_WIN32) && !defined(_DEBUG)
-int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nCmdShow)
+int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine, _In_ int nCmdShow)
 #else
-int main()
+int main(int argc, char** argv)
 #endif
 {
 #if defined(_WIN32) && defined(_DEBUG)
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif
 
-	std::fstream configFile("config.json", std::ios::in);
-	nlohmann::json config = nlohmann::json::parse(configFile, nullptr, true, true);
-	configFile.close();
+	//get name of config file from command line args
+	std::string configFileName = "config.json";
 
+#if defined(_WIN32) && !defined(_DEBUG)
+	//note that lpCmdLine is not passed here because it does not include the path to the exe (whereas
+	//GetCommandLineW() does contain it; it is required for CommandLineToArgvW to work correctly)
+	int argc;
+	wchar_t** argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+	if (argc >= 2)
+	{
+		std::wstring wconfigFileName = std::wstring(argv[1]);
+		configFileName = std::string(wconfigFileName.begin(), wconfigFileName.end());
+	}
+	LocalFree(argv);
+
+#else
+	if (argc >= 2)
+	{
+		configFileName = std::string(argv[1]);
+	}
+#endif
+	
+	//read in config file into json
+	nlohmann::json config;
+	try
+	{
+		std::fstream configFile(configFileName, std::ios::in);
+		if (!configFile.good()) throw std::exception(("Could not open config file named " + configFileName).c_str());
+		config = nlohmann::json::parse(configFile, nullptr, true, true);
+		configFile.close();
+	}
+	catch (std::exception& e)
+	{
+#if defined(_WIN32) && !defined(_DEBUG)
+		MessageBox(NULL, e.what(), "Error", MB_OK);
+#else
+		fprintf(stderr, "%s\n", e.what());
+#endif
+		abort();
+	}
+
+	//run program using config data
 	SceneManager manager;
 	manager.build();
 	manager.run({ new SimulationScene(config) });
