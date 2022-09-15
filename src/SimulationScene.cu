@@ -184,11 +184,13 @@ __global__ void cudaRun(
 			{
 				outPosition[i] = d_boundMin[i]; 
 				outVelocity[i] *= -d_restitutionCoefficient;
+				d_collisionForceDelta += sqrt(outVelocity[i] * outVelocity[i]);
 			}
 			else if (outPosition[i] > d_boundMax[i])
 			{
 				outPosition[i] = d_boundMax[i];
 				outVelocity[i] *= -d_restitutionCoefficient;
+				d_collisionForceDelta += sqrt(outVelocity[i] * outVelocity[i]);
 			}
 		}
 
@@ -480,6 +482,7 @@ void SimulationScene::spawnParticles(const pVec& pos, cudaStream_t stream)
 		{
 			m_newParticles[0].position = pos;
 			m_newParticles[0].velocity = pVec(0.0f);
+			m_newParticles[0].color = glm::vec4(redDis(rng), greenDis(rng), blueDis(rng), 1.0f);
 		}
 		else
 		{
@@ -554,12 +557,23 @@ void SimulationScene::update(float deltaTime)
 		{
 			if (m_collisions[i].force > maxForce) maxForce = m_collisions[i].force;
 		}
+
+		//if the highest force is sufficiently high, play a sound effect
 		if (maxForce > 0.5f)
 		{
-			//if the highest force is sufficiently high, play a sound effect
+			//get random sound; if it is currently playing, search all sounds until a stopped one is found
 			std::uniform_int_distribution<unsigned int> soundDis = std::uniform_int_distribution<unsigned int>(0, m_sounds.size() - 1);
-			SoundPlayer* sound = m_sounds[soundDis(rng)];
-			if (sound->isPlaying() == false)
+			unsigned int index = soundDis(rng);
+			unsigned int startIndex = index;
+			SoundPlayer* sound;
+			do
+			{
+				sound = m_sounds[index];
+				index = (index + 1) % m_sounds.size();
+			} while (sound->isPlaying() == true && index != startIndex);
+
+			//if a stopped sound was available, play it
+			if (index != startIndex)
 			{
 				//biggest force = louder and lower pitch
 				sound->setVolume(maxForce);
