@@ -56,6 +56,8 @@ private:
 		glm::vec2 particleRedRange;
 		glm::vec2 particleGreenRange;
 		glm::vec2 particleBlueRange;
+		float velocityColorLimit;
+		glm::vec4 velocityColor;
 		float particleRadius;
 		pVec velocityDullingFactor;
 		float velocityDullingFactorRate;

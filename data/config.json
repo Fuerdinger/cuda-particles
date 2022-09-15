@@ -20,6 +20,12 @@
 	"particleGreenRange": [ 0.0, 0.1 ],
 	"particleBlueRange": [ 0.65, 1.0 ],
 
+	//read velocityColor's description to see what this does
+	"velocityColorLimit": 500.0,
+
+	//the color a particle will be if its velocity's mag is equal to velocityColorLimit
+	"velocityColor": [1.0, 1.0, 1.0, 1.0],
+
 	//radius of the particle in the simulation
 	"particleRadius": 5.0,
 

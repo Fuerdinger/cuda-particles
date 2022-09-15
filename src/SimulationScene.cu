@@ -282,6 +282,7 @@ SimulationScene::Config::Config(nlohmann::json& json)
 	numParticlesAtStart = json["numParticlesAtStart"];
 	displayParticleRadius = json["displayParticleRadius"];
 	displayParticleVertices = json["displayParticleVertices"];
+	velocityColorLimit = json["velocityColorLimit"];
 
 	for (char i = 0; i < 2; i++)
 	{
@@ -296,6 +297,11 @@ SimulationScene::Config::Config(nlohmann::json& json)
 		gravity[i] = json["gravity"][i];
 		boundMin[i] = json["boundMin"][i];
 		boundMax[i] = json["boundMax"][i];
+	}
+
+	for (char i = 0; i < 4; i++)
+	{
+		velocityColor[i] = json["velocityColor"][i];
 	}
 
 	particleRadius = json["particleRadius"];
@@ -438,6 +444,10 @@ SimulationScene::SimulationScene(nlohmann::json& config)
 
 	//create rendering program from shaders
 	m_program = _util->createProgramFromDisk("shaders\\Vert.shader", "shaders\\Frag.shader");
+
+	//upload uniform vals that never change
+	glProgramUniform1fv(m_program, 1, 1, &m_cfg.velocityColorLimit);
+	glProgramUniform4fv(m_program, 2, 1, (GLfloat*)&m_cfg.velocityColor);
 }
 
 SimulationScene::~SimulationScene()

@@ -35,17 +35,14 @@ struct Particle
 
 layout(std140, binding = 0) readonly buffer Particles
 {
-	Particle particles[2048];
+	Particle particles[];
 };
 
 layout(location = 0) uniform mat4 view_proj;
+layout(location = 1) uniform float velocityColorLimit;
+layout(location = 2) uniform vec4 velocityColor;
 
 out vec4 col;
-
-float lerp(float x0, float x1, float t)
-{
-	return x0 + t * (x1 - x0);
-}
 
 void main()
 {
@@ -53,7 +50,5 @@ void main()
 	gl_Position = view_proj * vec4(inPosition.x + p.position.x, inPosition.y + p.position.y, 0.0f, 1.0f);
 
 	const float velocityMag = sqrt(dot(p.velocity, p.velocity));
-	const float maxVelocity = 100.0f;
-	float velocityColor = lerp(0.0f, 1.0f, clamp(velocityMag / maxVelocity, 0.0f, 1.0f));
-	col = p.color + velocityColor;
+	col = mix(p.color, velocityColor, clamp(velocityMag / velocityColorLimit, 0.0f, 1.0f));
 }
