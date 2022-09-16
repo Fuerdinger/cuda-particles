@@ -75,6 +75,7 @@ private:
 		float maxPitch;
 		float minPitch;
 		float minPitchForce;
+		float maxVolumeForce;
 		Config(nlohmann::json& json);
 	} const m_cfg;
 

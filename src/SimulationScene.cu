@@ -320,6 +320,7 @@ SimulationScene::Config::Config(nlohmann::json& json)
 	maxPitch = json["maxPitch"];
 	minPitch = json["minPitch"];
 	minPitchForce = json["minPitchForce"];
+	maxVolumeForce = json["maxVolumeForce"];
 }
 
 SimulationScene::SimulationScene(nlohmann::json& config)
@@ -559,7 +560,7 @@ void SimulationScene::update(float deltaTime)
 		}
 
 		//if the highest force is sufficiently high, play a sound effect
-		if (maxForce > 0.5f)
+		if (maxForce / m_cfg.maxVolumeForce > 0.005f)
 		{
 			//get random sound; if it is currently playing, search all sounds until a stopped one is found
 			std::uniform_int_distribution<unsigned int> soundDis = std::uniform_int_distribution<unsigned int>(0, m_sounds.size() - 1);
@@ -575,8 +576,8 @@ void SimulationScene::update(float deltaTime)
 			//if a stopped sound was available, play it
 			if (index != startIndex)
 			{
-				//biggest force = louder and lower pitch
-				sound->setVolume(maxForce);
+				//bigger force = louder and lower pitch
+				sound->setVolume(lerp(0.0f, 100.0f, std::min(maxForce / m_cfg.maxVolumeForce, 1.0f)));
 				sound->setPitch(lerp(m_cfg.maxPitch, m_cfg.minPitch, std::min(maxForce / m_cfg.minPitchForce, 1.0f)));
 				sound->play();
 			}

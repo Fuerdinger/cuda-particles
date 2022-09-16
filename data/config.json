@@ -24,7 +24,7 @@
 	"velocityColorLimit": 500.0,
 
 	//the color a particle will be if its velocity's mag is equal to velocityColorLimit
-	"velocityColor": [1.0, 1.0, 1.0, 1.0],
+	"velocityColor": [ 1.0, 1.0, 1.0, 1.0 ],
 
 	//radius of the particle in the simulation
 	"particleRadius": 5.0,
@@ -74,5 +74,8 @@
 	"minPitch": 0.2,
 
 	//how high the velocity of 2 particles in a collision should be to play sfx at the lowest pitch
-	"minPitchForce": 100.0
+	"minPitchForce": 100.0,
+
+	//how high the velocity of 2 particles in a collision should be to play sfx at the highest volume
+	"maxVolumeForce": 1000.0
 }
