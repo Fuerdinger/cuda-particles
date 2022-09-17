@@ -75,8 +75,33 @@ int main(int argc, char** argv)
 		abort();
 	}
 
+	//get resolution of window based on bounds of particle simulation
+	const int left = abs(int(config["boundMin"][0]));
+	const int right = abs(int(config["boundMax"][0]));
+	const int bottom = abs(int(config["boundMin"][1]));
+	const int top = abs(int(config["boundMax"][1]));
+	const int width = std::max(left, right) * 2;
+	const int height = std::max(bottom, top) * 2;
+	const glm::ivec2 resolution = glm::ivec2(width, height);
+
+	//get the basename of the json to put into the window's title decorator
+	size_t extensionPos = configFileName.find_last_of('.');
+	if (extensionPos == std::string::npos) extensionPos = configFileName.size();
+	size_t dirPos = configFileName.find_last_of('\\');
+	if (dirPos == std::string::npos)
+	{
+		dirPos = configFileName.find_last_of('/');
+		if (dirPos == std::string::npos) dirPos = 0;
+		else dirPos += 1;
+	}
+	else dirPos += 1;
+	const std::string configFileBaseName = configFileName.substr(dirPos, extensionPos - dirPos);
+
 	//run program using config data
-	SceneManager manager;
+	SceneManager manager(new WindowManager("cuda-particles: " + configFileBaseName,
+		WindowManager::State::WINDOWED,
+		WindowManager::Mode::UI,
+		resolution));
 	manager.build();
 	manager.run({ new SimulationScene(config) });
 }
