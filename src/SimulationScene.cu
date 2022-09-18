@@ -327,6 +327,13 @@ SimulationScene::SimulationScene(nlohmann::json& config)
 	: Scene("Simulation")
 	, m_cfg(config)
 {
+	//seed rng deterministically or randomly depending on build
+#ifdef _DEBUG
+	rng.seed(0);
+#else
+	rng.seed(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+#endif
+
 	//load audio files
 	_sounds->setPath("sfx\\");
 	std::vector<std::string> soundNames;
