@@ -1,46 +1,46 @@
 {
 	//number of particles in the simulation
-	"maxNumParticles": 10000,
+	"maxNumParticles": 8,
 
 	//number of particles to spawn when user clicks on screen
-	"numParticlesToSpawn": 5,
+	"numParticlesToSpawn": 1,
 
 	//number of particles which should already be in scene at start
-	"numParticlesAtStart": 0,
+	"numParticlesAtStart": 8,
 
 	//radius of the particle to render
-	"displayParticleRadius": 6.0,
+	"displayParticleRadius": 10.0,
 
 	//number of vertices on the circumference of a particle's circle
 	//(-2 to include origin and first vertex twice)
-	"displayParticleVertices": 12,
+	"displayParticleVertices": 100,
 
 	//color value ranges for the particles
-	"particleRedRange": [ 0.0, 0.05 ],
-	"particleGreenRange": [ 0.0, 0.3 ],
-	"particleBlueRange": [ 0.8, 1.0 ],
+	"particleRedRange": [ 0.3, 1.0 ],
+	"particleGreenRange": [ 0.3, 1.0 ],
+	"particleBlueRange": [ 0.3, 1.0 ],
 
 	//read velocityColor's description to see what this does
-	"velocityColorLimit": 500.0,
+	"velocityColorLimit": 3000.0,
 
 	//the color a particle will be if its velocity's mag is equal to velocityColorLimit
-	"velocityColor": [1.0, 1.0, 1.0, 1.0],
+	"velocityColor": [1.0, 0.0, 0.0, 1.0],
 
 	//radius of the particle in the simulation
-	"particleRadius": 5.0,
+	"particleRadius": 10.0,
 
 	//how much to multiply velocity by each frame
-	"velocityDullingFactor": [ 0.98, 1.0 ],
+	"velocityDullingFactor": [ 1.0, 1.0 ],
 
 	//velocity will be dulled this many times a second
 	"velocityDullingFactorRate": 60.0,
 
 	//how elastic/inelastic the particle collisions are
 	//0.0 = inelastic, 1.0 = elastic
-	"restitutionCoefficient": 0.2,
+	"restitutionCoefficient": 1.0,
 
 	//constant force applied to simulation
-	"gravity": [ 0.0, -20.0 ],
+	"gravity": [ 0.0, 0.0 ],
 
 	//bottom left corner of simulation
 	"boundMin": [ -250.0, -250.0 ],
@@ -52,30 +52,30 @@
 	"maxExplodeRange": 50.0,
 
 	//the velocity of a particle right next to an explosion (tapers off as it is farther away)
-	"maxExplodeForce": 5.0,
+	"maxExplodeForce": 20.0,
 
 	//distance where a particle will be impacted by suction
 	"maxSuctionRange": 100.0,
 
 	//the velocity of a particle right next to the suction (tapers off as it is farther away)
-	"maxSuctionForce": 5.0,
+	"maxSuctionForce": 10.0,
 
 	//whether to play audio or not
 	"audioOn": true,
 
 	//only sound files which contain this in their filenames will be used; set to empty to load all sound files
-	"audioFilePrefix": "water",
+	"audioFilePrefix": "ball",
 
 	//number of sounds which can play at once; set to 0 to make it default to number of sounds in sfx/
-	"numSoundPlayers": 12,
+	"numSoundPlayers": 54,
 
 	//the highest/lowest pitch an audio file may be played at
-	"maxPitch": 0.6,
+	"maxPitch": 1.4,
 	"minPitch": 0.2,
 
 	//how high the velocity of 2 particles in a collision should be to play sfx at the lowest pitch
 	"minPitchForce": 500.0,
 
 	//how high the velocity of 2 particles in a collision should be to play sfx at the highest volume
-	"maxVolumeForce": 3000.0
+	"maxVolumeForce": 1000.0
 }

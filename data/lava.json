@@ -9,28 +9,28 @@
 	"numParticlesAtStart": 0,
 
 	//radius of the particle to render
-	"displayParticleRadius": 6.0,
+	"displayParticleRadius": 4.0,
 
 	//number of vertices on the circumference of a particle's circle
 	//(-2 to include origin and first vertex twice)
 	"displayParticleVertices": 12,
 
 	//color value ranges for the particles
-	"particleRedRange": [ 0.0, 0.05 ],
+	"particleRedRange": [ 0.8, 1.0 ],
 	"particleGreenRange": [ 0.0, 0.3 ],
-	"particleBlueRange": [ 0.8, 1.0 ],
+	"particleBlueRange": [ 0.0, 0.05 ],
 
 	//read velocityColor's description to see what this does
 	"velocityColorLimit": 500.0,
 
 	//the color a particle will be if its velocity's mag is equal to velocityColorLimit
-	"velocityColor": [1.0, 1.0, 1.0, 1.0],
+	"velocityColor": [1.0, 1.0, 0.0, 1.0],
 
 	//radius of the particle in the simulation
-	"particleRadius": 5.0,
+	"particleRadius": 3.0,
 
 	//how much to multiply velocity by each frame
-	"velocityDullingFactor": [ 0.98, 1.0 ],
+	"velocityDullingFactor": [ 0.97, 1.0 ],
 
 	//velocity will be dulled this many times a second
 	"velocityDullingFactorRate": 60.0,
@@ -40,7 +40,7 @@
 	"restitutionCoefficient": 0.2,
 
 	//constant force applied to simulation
-	"gravity": [ 0.0, -20.0 ],
+	"gravity": [ 0.0, -50.0 ],
 
 	//bottom left corner of simulation
 	"boundMin": [ -250.0, -250.0 ],
@@ -64,18 +64,18 @@
 	"audioOn": true,
 
 	//only sound files which contain this in their filenames will be used; set to empty to load all sound files
-	"audioFilePrefix": "water",
+	"audioFilePrefix": "lava",
 
 	//number of sounds which can play at once; set to 0 to make it default to number of sounds in sfx/
-	"numSoundPlayers": 12,
+	"numSoundPlayers": 8,
 
 	//the highest/lowest pitch an audio file may be played at
-	"maxPitch": 0.6,
+	"maxPitch": 0.8,
 	"minPitch": 0.2,
 
 	//how high the velocity of 2 particles in a collision should be to play sfx at the lowest pitch
-	"minPitchForce": 500.0,
+	"minPitchForce": 5000.0,
 
 	//how high the velocity of 2 particles in a collision should be to play sfx at the highest volume
-	"maxVolumeForce": 3000.0
+	"maxVolumeForce": 10000.0
 }

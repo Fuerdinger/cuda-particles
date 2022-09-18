@@ -9,44 +9,44 @@
 	"numParticlesAtStart": 0,
 
 	//radius of the particle to render
-	"displayParticleRadius": 6.0,
+	"displayParticleRadius": 5.0,
 
 	//number of vertices on the circumference of a particle's circle
 	//(-2 to include origin and first vertex twice)
-	"displayParticleVertices": 12,
+	"displayParticleVertices": 5,
 
 	//color value ranges for the particles
-	"particleRedRange": [ 0.0, 0.05 ],
-	"particleGreenRange": [ 0.0, 0.3 ],
-	"particleBlueRange": [ 0.8, 1.0 ],
+	"particleRedRange": [ 0.8, 0.9 ],
+	"particleGreenRange": [ 0.6, 0.7 ],
+	"particleBlueRange": [ 0.5, 0.6 ],
 
 	//read velocityColor's description to see what this does
 	"velocityColorLimit": 500.0,
 
 	//the color a particle will be if its velocity's mag is equal to velocityColorLimit
-	"velocityColor": [1.0, 1.0, 1.0, 1.0],
+	"velocityColor": [0.6, 0.4, 0.3, 1.0],
 
 	//radius of the particle in the simulation
-	"particleRadius": 5.0,
+	"particleRadius": 3.0,
 
 	//how much to multiply velocity by each frame
-	"velocityDullingFactor": [ 0.98, 1.0 ],
+	"velocityDullingFactor": [ 0.88, 1.0 ],
 
 	//velocity will be dulled this many times a second
 	"velocityDullingFactorRate": 60.0,
 
 	//how elastic/inelastic the particle collisions are
 	//0.0 = inelastic, 1.0 = elastic
-	"restitutionCoefficient": 0.2,
+	"restitutionCoefficient": 0.1,
 
 	//constant force applied to simulation
-	"gravity": [ 0.0, -20.0 ],
+	"gravity": [ 0.0, -150.0 ],
 
 	//bottom left corner of simulation
-	"boundMin": [ -250.0, -250.0 ],
+	"boundMin": [ -100.0, -250.0 ],
 
 	//top right corner of simulation
-	"boundMax": [ 250.0, 250.0 ],
+	"boundMax": [ 100.0, 250.0 ],
 
 	//distance where a particle will be impacted by an explosion
 	"maxExplodeRange": 50.0,
@@ -64,18 +64,18 @@
 	"audioOn": true,
 
 	//only sound files which contain this in their filenames will be used; set to empty to load all sound files
-	"audioFilePrefix": "water",
+	"audioFilePrefix": "sand",
 
 	//number of sounds which can play at once; set to 0 to make it default to number of sounds in sfx/
-	"numSoundPlayers": 12,
+	"numSoundPlayers": 9,
 
 	//the highest/lowest pitch an audio file may be played at
 	"maxPitch": 0.6,
 	"minPitch": 0.2,
 
 	//how high the velocity of 2 particles in a collision should be to play sfx at the lowest pitch
-	"minPitchForce": 500.0,
+	"minPitchForce": 50000.0,
 
 	//how high the velocity of 2 particles in a collision should be to play sfx at the highest volume
-	"maxVolumeForce": 3000.0
+	"maxVolumeForce": 250000.0
 }
