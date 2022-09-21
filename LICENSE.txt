@@ -1,4 +1,4 @@
-C++ OpenGL Game Framework
+CUDA Particle Simulator
 
 The MIT License (MIT)
 
