@@ -7,6 +7,12 @@ except where specified otherwise.
 It does not apply to third party DLLs linked against the executable, or the third party 
 libraries used to create the executable.
 
+The sound effect files in the data folder (*.ogg) were created using a piece of software
+called pxtone (https://studiopixel.sakura.ne.jp/pxtone/). Daniel Fuerlinger does not claim
+copyrights over them, nor does he claim ownership over any video or audio content you create
+using this software. But if you use this software to create such content, he would appreciate
+if you could mention that it was created using this software.
+
 NOTICE: You may provide your own version of OpenAL32.dll to use with this software. See the
 website for OpenAL Soft (https://openal-soft.org/) to learn more on where to obtain your
 own version.
