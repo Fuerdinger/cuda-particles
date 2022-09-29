@@ -55,7 +55,7 @@ endif()
 project("cuda-particles"
 	VERSION 1.0.0
 	DESCRIPTION "fork of cpp-opengl-game-framework for doing particle simulations"
-	HOMEPAGE_URL "https://github.com/Fuerdinger/cpp-opengl-game-framework"
+	HOMEPAGE_URL "https://github.com/Fuerdinger/cuda-particles"
 	LANGUAGES CXX CUDA
 )
 
