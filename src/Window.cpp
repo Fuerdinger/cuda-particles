@@ -387,7 +387,7 @@ void WindowManager::switchMode(Mode mode)
 	m_mode = mode;
 }
 
-WindowManager::WindowManager(const std::string& name, State state, Mode mode)
+WindowManager::WindowManager(const std::string& name, State state, Mode mode, const glm::ivec2& resolution)
 {
 	//init GLFW window
 	if (!glfwInit())
@@ -418,9 +418,17 @@ WindowManager::WindowManager(const std::string& name, State state, Mode mode)
 	switch (state)
 	{
 	case State::WINDOWED:
-		//draggable windows should be a quarter of the monitor size
-		width = vidMode->width / 2;
-		height = vidMode->height / 2;
+		//draggable windows should be a quarter of the monitor size (unless otherwise specified)
+		if (resolution.x == 0 && resolution.y == 0)
+		{
+			width = vidMode->width / 2;
+			height = vidMode->height / 2;
+		}
+		else
+		{
+			width = resolution.x;
+			height = resolution.y;
+		}
 		monitor = nullptr;
 		break;
 	case State::FULLSCREEN:
@@ -461,8 +469,7 @@ WindowManager::WindowManager(const std::string& name, State state, Mode mode)
 	//get window position; set it to the center of the screen if in windowed mode
 	if (state == State::WINDOWED)
 	{
-		m_pos = m_size - (m_size / 2);
-		glfwSetWindowPos(m_window, m_pos.x, m_pos.y);
+		glfwSetWindowPos(m_window, (vidMode->width - m_size.x) / 2, (vidMode->height - m_size.y) / 2);
 	}
 	else
 	{

@@ -141,11 +141,12 @@ public:
 	 * @param[in] name The text which should be put into the window's decoration (if not fullscreen)
 	 * @param[in] state How the window should be created to start with.
 	 * @param[in] mode The input mode the window should have to start with.
+	 * @param[in] resolution If windowed, what should the resolution be.
 	 * @pre Only one WindowManager may be instantiated in the application.
 	 * @post Instantiating a WindowManager will create an OpenGL context, which the
 	 * rest of the application will use.
 	 */
-	WindowManager(const std::string& name = "Game", State state = State::WINDOWED, Mode mode = Mode::UI);
+	WindowManager(const std::string& name = "Game", State state = State::WINDOWED, Mode mode = Mode::UI, const glm::ivec2& resolution = glm::ivec2(0, 0));
 
 	/**
 	 * Destructs the window and the OpenGL context.
