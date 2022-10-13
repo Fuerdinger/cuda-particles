@@ -62,7 +62,7 @@ find_package(glad REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(glm REQUIRED)
 find_package(SFML COMPONENTS audio REQUIRED)
-find_package(stb REQUIRED)
+find_path(STB_INCLUDE_DIRS "stb_image.h" "stb_image_write.h")
 
 # Specify source/header files and create the executable
 # These are specified as vars to keep them separate from ${SOURCES} and ${INCLUDE_DIRECTORIES}
@@ -86,14 +86,12 @@ target_precompile_headers(${PROJECT_NAME} PRIVATE "include/pch.h")
 # Windows release builds should not be console apps
 set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE $<CONFIG:Release>)
 
-# These libraries have source code which must be linked
+# Linking / including the libraries
 target_link_libraries(${PROJECT_NAME} PRIVATE glad::glad)
 target_link_libraries(${PROJECT_NAME} PRIVATE glfw)
+target_link_libraries(${PROJECT_NAME} PRIVATE glm::glm)
 target_link_libraries(${PROJECT_NAME} PRIVATE sfml-audio)
-
-# These libraries are header only
-target_include_directories(${PROJECT_NAME} PRIVATE glm)
-target_include_directories(${PROJECT_NAME} PRIVATE stb)
+target_include_directories(${PROJECT_NAME} PRIVATE ${STB_INCLUDE_DIRS})
 
 # Use doxygen to generate the documentation
 find_package(Doxygen)

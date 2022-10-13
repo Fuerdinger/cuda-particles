@@ -44,7 +44,7 @@ void SceneManager::init(const std::vector<Scene*>& scenes, const std::string& fi
 	switchTo(m_currentSceneName);
 }
 
-void SceneManager::update(std::chrono::steady_clock::time_point& timestamp)
+void SceneManager::update(std::chrono::high_resolution_clock::time_point& timestamp)
 {
 	m_window->processPolls();
 

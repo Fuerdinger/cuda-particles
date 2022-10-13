@@ -63,7 +63,7 @@ private:
 	bool m_hasExited;
 
 	void init(const std::vector<Scene*>& scenes, const std::string& firstScene);
-	void update(std::chrono::steady_clock::time_point& timestamp);
+	void update(std::chrono::high_resolution_clock::time_point& timestamp);
 
 public:
 	/**

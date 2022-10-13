@@ -60,6 +60,7 @@ THE SOFTWARE.
 #include <glm/gtx/quaternion.hpp>
 
 //C runtime and STL
+#include <cstring>
 #include <string>
 #include <vector>
 #include <map>
